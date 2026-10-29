@@ -8,6 +8,8 @@ KickforgeProcessor::KickforgeProcessor()
 {
     gainParam = apvts.getRawParameterValue ("glob_gain");
     click.bindParams (apvts);
+    sub.bind (apvts, subCurves);
+    subCurves.resetAll();
 }
 
 void KickforgeProcessor::prepareToPlay (double sr, int block)
@@ -30,7 +32,16 @@ void KickforgeProcessor::handleMidi (const juce::MidiMessage& m)
         sub.noteOn (m.getNoteNumber(), m.getFloatVelocity());
         click.noteOn (m.getNoteNumber(), m.getFloatVelocity());
     }
-    else if (m.isNoteOff() || m.isAllNotesOff() || m.isAllSoundOff())
+    else if (m.isPitchWheel())
+    {
+        sub.setPitchBend ((float) (m.getPitchWheelValue() - 8192) / 8192.0f);
+    }
+    else if (m.isNoteOff())
+    {
+        sub.noteOff (m.getNoteNumber());
+        click.noteOff();
+    }
+    else if (m.isAllNotesOff() || m.isAllSoundOff())
     {
         sub.noteOff();
         click.noteOff();
@@ -88,5 +99,6 @@ void KickforgeProcessor::setStateInformation (const void* data, int size)
         {
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
             click.loadState (apvts.state.getChildWithName ("click"));
+            subCurves.loadFromState();
         }
 }
