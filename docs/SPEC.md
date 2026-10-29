@@ -34,7 +34,7 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [x] S-09 Amp (volume) envelope per layer, node-based curve editor
 - [x] S-10 Pitch curve Bezier segments (curvature per segment)
 - [x] S-11 Amp curve Bezier segments
-- [ ] S-12 Pitch snap: node pitch values snap to musical notes (toggle)
+- [x] S-12 Pitch snap: node pitch values snap to musical notes (toggle)
 - [x] S-13 Base tuning of sub in Hz and/or note name with fine tune in cents (unverified ranges; suggested 20-400 Hz, +/-100 cents)
 - [x] S-14 Key tracking on/off per layer
 - [ ] S-15 Selective key tracking: choose which pitch-curve node(s) follow MIDI note, so the tail transposes and the initial thump stays fixed
@@ -54,7 +54,7 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [x] C-05 Sample layer amp envelope curve and length/trim
 - [x] C-06 Sample layer phase flip (180 degrees)
 - [x] C-07 Per-layer volume and routing to FX buses (see F-xx)
-- [ ] C-08 Drag-and-drop a sample onto a layer
+- [x] C-08 Drag-and-drop a sample onto a layer
 - [x] C-09 Built-in click sample library browser (500 clicks in KICK 3; Kickforge ships synthesized clicks instead)
 - [ ] C-10 Swap the top-end sample after AI import without touching the sub (see P-xx)
 
@@ -79,7 +79,7 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [x] F-18 1176-style (FET) compressor
 - [x] F-19 4 macro knobs, each controlling one effect parameter (mapping to arbitrary param, range unverified)
 - [x] F-20 Dedicated EQ tab: 2 parametric bands plus low shelf and high shelf
-- [ ] F-21 EQ tab spectrum analyser (spectral display)
+- [x] F-21 EQ tab spectrum analyser (spectral display)
 - [x] F-22 Output limiter on master with 3 release settings
 - [x] F-23 Output limiter with 3 lookahead settings
 - [x] F-24 Limiter adds saturation when driven hard; input gain/ceiling controls (unverified)
@@ -103,21 +103,21 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [ ] G-14 Formats: VST3 (AU/AAX out of scope for us)
 
 ## U - UI
-- [ ] U-01 Resizable plugin window
-- [ ] U-02 Node-based pitch curve editor: add, drag, delete nodes
-- [ ] U-03 Node-based amp curve editor
-- [ ] U-04 Bezier handle editing of segments
-- [ ] U-05 Toggle log vs linear time view (log = zoomed-in attack; linear = amplitude work)
-- [ ] U-06 Zoom and pan of curve view
-- [ ] U-07 Undo / redo of edits
-- [ ] U-08 Node context menu (e.g. right-click phase lock; selective key-track toggle)
-- [ ] U-09 Waveform display of resulting sound
-- [ ] U-10 Spectrum analyser in EQ tab
-- [ ] U-11 Pitch readout in Hz and note name for fundamental/node under cursor (unverified)
-- [ ] U-12 Tabs: Layers/sub, Effects, EQ, Trigger (as reported)
-- [ ] U-13 Per-layer panels showing layer type, level and routing
-- [ ] U-14 Macro knobs panel
-- [ ] U-15 Audition button / play kick without MIDI (unverified)
+- [x] U-01 Resizable plugin window
+- [x] U-02 Node-based pitch curve editor: add, drag, delete nodes
+- [x] U-03 Node-based amp curve editor
+- [x] U-04 Bezier handle editing of segments
+- [x] U-05 Toggle log vs linear time view (log = zoomed-in attack; linear = amplitude work)
+- [x] U-06 Zoom and pan of curve view
+- [x] U-07 Undo / redo of edits
+- [x] U-08 Node context menu (e.g. right-click phase lock; selective key-track toggle)
+- [x] U-09 Waveform display of resulting sound
+- [x] U-10 Spectrum analyser in EQ tab
+- [x] U-11 Pitch readout in Hz and note name for fundamental/node under cursor (unverified)
+- [x] U-12 Tabs: Layers/sub, Effects, EQ, Trigger (as reported)
+- [x] U-13 Per-layer panels showing layer type, level and routing
+- [x] U-14 Macro knobs panel
+- [x] U-15 Audition button / play kick without MIDI (unverified)
 
 ## P - Presets / export
 - [x] P-01 Preset save/load/browser with categories (540+ presets in KICK 3)

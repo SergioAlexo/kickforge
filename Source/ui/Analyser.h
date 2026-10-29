@@ -46,7 +46,7 @@ private:
     juce::dsp::FFT fft { fftOrder };
     juce::dsp::WindowingFunction<float> window { (size_t) fftSize, juce::dsp::WindowingFunction<float>::hann };
 
-    long silentRun = 1 << 30;
+    long silentRun = 1 << 30, armRun = 1 << 30;
     bool capturing = false;
     int kickVersion = 0;
     size_t maxKick = 72000;

@@ -45,12 +45,13 @@ void Analyser::ingest (const float* s, int n)
         ring[(size_t) writePos] = x;
         writePos = (writePos + 1) & (fftSize - 1);
 
-        if (! capturing && a > 0.02f && silentRun > holdoff)
+        if (! capturing && a > 0.02f && armRun > holdoff)
         {
             capturing = true;
             kick.clear();
             ++kickVersion;
         }
+        if (a < 0.02f) ++armRun; else armRun = 0;
         if (a < 0.002f) ++silentRun; else silentRun = 0;
 
         if (capturing)

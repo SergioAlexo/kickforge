@@ -277,10 +277,10 @@ void FxPanel::resized()
     quality.setBounds (996, 6, 96, 22);
     for (int i = 0; i < 4; ++i)
     {
-        const int y = 34 + i * 75;
-        macros[(size_t) i]->value.setBounds (732, y, 74, 74);
-        macros[(size_t) i]->target.setBounds (814, y + 28, 170, 24);
-        macros[(size_t) i]->amount.setBounds (992, y, 74, 74);
+        const int y = 32 + i * 74;
+        macros[(size_t) i]->value.setBounds (732, y, 74, 70);
+        macros[(size_t) i]->target.setBounds (814, y + 26, 170, 24);
+        macros[(size_t) i]->amount.setBounds (992, y, 74, 70);
     }
 }
 

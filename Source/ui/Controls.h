@@ -9,6 +9,7 @@ using APVTS = juce::AudioProcessorValueTreeState;
 /** Compact numeric text for knob read-outs. */
 inline juce::String formatKnobValue (double v, const juce::String& unit)
 {
+    if (std::abs (v) < 0.005) v = 0.0; // avoid "-0.00"
     const double a = std::abs (v);
     juce::String s;
     if (a >= 10000.0) s = juce::String (v / 1000.0, 1) + "k";
@@ -57,6 +58,7 @@ public:
         auto r = getLocalBounds();
         title.setBounds (r.removeFromTop (14));
         slider.setBounds (r);
+        slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, std::max (40, getWidth() - 6), 14);
     }
 
     juce::Label title;
