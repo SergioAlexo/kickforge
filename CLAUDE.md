@@ -20,6 +20,10 @@ Add `-- /m` to the build for parallel MSVC. `build/` is gitignored.
 - Install the built VST3 system-wide: `scripts\install-vst3.ps1` (run from an elevated PowerShell; copies `Kickforge.vst3` to `C:\Program Files\Common Files\VST3`, prints a clear message and exits if not admin or if the build is missing; `-Config Debug` / `-Source <path>` optional).
 - Master dynamics are stereo-linked: the processor runs two FxChains (L/R, mono EQ/slot state) but Comp/FetComp slots, the master compressor and the limiter detect on max(|L|,|R|) and apply one gain (`FxChain::processBusPair` / `processMasterPair`; limiter `process2`). Hardening tests live in `tests/HardeningTests.cpp`.
 
+## AI link (match a real kick)
+- `kickforge-cli` (target `KickforgeCli`, `build\Release\kickforge-cli.exe`) drives the plugin from the command line; contract in `docs/AI-LINK.md`, workflow in the `match-kick` skill (`.claude/skills/match-kick/SKILL.md`).
+- Plugin side: `Source/live` (Live folder `%APPDATA%\Kickforge\Live` or env `KICKFORGE_LIVE_DIR`, Reference A/B). CLI: `Source/cli`, metrics in `Source/analysis/KickMetrics.*`.
+
 ## Layout / module ownership
 - `Source/PluginProcessor.*`, `Params.*`, `CMakeLists.txt`: shared; only small, scoped additions.
 - `Source/core/` Curve (breakpoint envelope), Tuning, GlobParams (`glob_`): scaffold.

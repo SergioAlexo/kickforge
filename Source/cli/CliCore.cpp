@@ -12,6 +12,7 @@
 #include "analysis/KickImport.h"
 #include "analysis/KickMetrics.h"
 #include "presets/KickRenderer.h"
+#include "presets/PresetManager.h"
 
 namespace kf::cli
 {
@@ -795,6 +796,8 @@ const std::map<std::string, std::string>& helpTexts()
         { "plot", "plot [--ref wav] --out png [--state f]\n  1200x800 PNG: waveform overlay (first 300 ms), pitch track, envelope dB, spectrum. Reference = blue, synth = orange.\n" },
         { "import", "import [--ref wav] [--region a:b] [--out file] [--apply]\n  First-pass fit using the importer analysis: sub params, pitch/amp curves, harmonics and a top-end click sample.\n  Starts from --state (or the Init state if no state file exists).\n" },
         { "fit", "fit [--ref wav] [--params id,id] [--curves pitch,amp] [--iters 200] [--out file] [--apply]\n  Bounded coordinate search on the compare loss. Default params: sub_tune,sub_fine,sub_length,sub_gain; default curves: pitch,amp\n  (every point value and tension). Budget = --iters renders (default 200). Prints before/after score and changed values.\n  Never touches the live state unless --apply.\n" },
+        { "init", "init [--preset name] [--out f] [--apply]\n  A fresh state: the plugin defaults, or a factory preset (name match is case-insensitive; see `presets`).\n  Use it to start a match without the plugin open; nothing is written without --out/--apply.\n" },
+        { "presets", "presets\n  Factory preset names and categories (for `init --preset`).\n" },
         { "apply", "apply [--state f] [--timeout 3]\n  Writes Live/apply.kfpreset (via .tmp + rename) and waits for status.json `applied` to increase.\n  {\"applied\":true} on confirmation; {\"applied\":false,...} if no plugin answers (not an error).\n" },
     };
     return m;
@@ -803,7 +806,7 @@ const std::map<std::string, std::string>& helpTexts()
 std::string helpAll()
 {
     return std::string (kVersion) + "\nUsage: kickforge-cli <command> [options]   (JSON on stdout; --text pretty-prints; errors: {\"error\":...} + exit code 1)\n"
-        "Commands: status params get set curve render analyze compare plot import fit apply help\n"
+        "Commands: status init presets params get set curve render analyze compare plot import fit apply help\n"
         "Common: --state <file> (default Live/state.kfpreset)   --ref <wav> (default Live/reference.json)   --full (more output)\n"
         "Live dir: %APPDATA%\\Kickforge\\Live or env KICKFORGE_LIVE_DIR. `kickforge-cli help <command>` for details.\n";
 }
@@ -1062,6 +1065,33 @@ juce::var cmdApply (Session& s, const Args& a, const LiveFiles& live)
     loadSession (s, a, live); // validates the file is a real state before pushing it
     return pushApply (s, live, a.num ("timeout", 3.0));
 }
+
+juce::var cmdPresets()
+{
+    juce::Array<juce::var> list;
+    for (auto& p : factoryPresets())
+        list.add (Obj().add ("name", p.name).add ("category", p.category));
+    return Obj().add ("presets", list);
+}
+
+juce::var cmdInit (Session& s, const Args& a, const LiveFiles& live)
+{
+    Obj o;
+    if (a.has ("preset"))
+    {
+        const juce::String want = juce::String (a.get ("preset")).trim();
+        const FactoryPreset* hit = nullptr;
+        for (auto& p : factoryPresets())
+            if (p.name.equalsIgnoreCase (want)) { hit = &p; break; }
+        if (hit == nullptr) throw Err ("no factory preset named '" + want.toStdString() + "' (see `kickforge-cli presets`)");
+        s.loadXml (*hit->state);
+        o.add ("preset", hit->name).add ("category", hit->category);
+    }
+    else
+        o.add ("preset", "defaults");
+    finishWrite (s, a, live, o);
+    return o;
+}
 } // namespace
 
 // ------------------------------------------------------------------ entry
@@ -1090,6 +1120,8 @@ std::string run (const std::vector<std::string>& argv, int& exitCode)
         juce::var result;
         if (cmd == "status") result = cmdStatus (a, live);
         else if (cmd == "analyze") result = cmdAnalyze (a);
+        else if (cmd == "presets") result = cmdPresets();
+        else if (cmd == "init") { auto s = std::make_unique<Session>(); result = cmdInit (*s, a, live); }
         else
         {
             static const std::set<std::string> known = { "params", "get", "set", "curve", "render", "compare", "plot", "import", "fit", "apply" };

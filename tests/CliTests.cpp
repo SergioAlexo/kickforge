@@ -277,3 +277,21 @@ TEST_CASE ("cli: the real kickforge-cli.exe runs (if built)", "[cli]")
     REQUIRE (juce::JSON::parse (out, v).wasOk());
     CHECK (v.getProperty ("values", {}).hasProperty ("sub_tune"));
 }
+
+TEST_CASE ("cli: presets lists factory presets and init writes defaults or a preset", "[cli]")
+{
+    Dir t;
+    auto pr = runJson ({ "presets" });
+    REQUIRE (pr.getProperty ("presets", {}).size() >= 20);
+    int code = 1;
+    runJson ({ "init", "--out", t["d.kfpreset"].getFullPathName().toStdString() }, &code);
+    REQUIRE (code == 0);
+    REQUIRE (t["d.kfpreset"].existsAsFile());
+    auto r = runJson ({ "init", "--preset", "clean SUB", "--out", t["c.kfpreset"].getFullPathName().toStdString() }, &code);
+    REQUIRE (code == 0);
+    REQUIRE (r.getProperty ("preset", {}).toString() == "Clean Sub");
+    auto a = runJson ({ "analyze", renderWav (t["c.kfpreset"], t["c.wav"]).getFullPathName().toStdString() });
+    REQUIRE (std::abs (num (a.getProperty ("features", {}), "tail_hz") - 55.0) < 3.0);
+    runJson ({ "init", "--preset", "no such preset" }, &code);
+    REQUIRE (code != 0);
+}
