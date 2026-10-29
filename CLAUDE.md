@@ -17,6 +17,9 @@ Add `-- /m` to the build for parallel MSVC. `build/` is gitignored.
 - Standalone: `build\Kickforge_artefacts\Release\Standalone\Kickforge.exe`
 - `COPY_PLUGIN_AFTER_BUILD` is FALSE: nothing is installed automatically. REAPER is NOT installed on this PC yet; when it is, either add `build\Kickforge_artefacts\Release\VST3` to REAPER's VST scan paths or copy `Kickforge.vst3` to `C:\Program Files\Common Files\VST3`.
 
+- Install the built VST3 system-wide: `scripts\install-vst3.ps1` (run from an elevated PowerShell; copies `Kickforge.vst3` to `C:\Program Files\Common Files\VST3`, prints a clear message and exits if not admin or if the build is missing; `-Config Debug` / `-Source <path>` optional).
+- Master dynamics are stereo-linked: the processor runs two FxChains (L/R, mono EQ/slot state) but Comp/FetComp slots, the master compressor and the limiter detect on max(|L|,|R|) and apply one gain (`FxChain::processBusPair` / `processMasterPair`; limiter `process2`). Hardening tests live in `tests/HardeningTests.cpp`.
+
 ## Layout / module ownership
 - `Source/PluginProcessor.*`, `Params.*`, `CMakeLists.txt`: shared; only small, scoped additions.
 - `Source/core/` Curve (breakpoint envelope), Tuning, GlobParams (`glob_`): scaffold.

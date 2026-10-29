@@ -47,6 +47,12 @@ public:
     void processBus (int bus, float* x, int num);
     void processMaster (float* x, int num);
 
+    /** Stereo-linked versions used by the processor: `left` owns the shared dynamics (Comp/FetComp slots,
+        master compressor, limiter: detection = max(|L|,|R|), one gain applied to both channels);
+        `right` supplies the per-channel state for the right signal. Settings must match (call beginBlock on both). */
+    static void processBusPair (FxChain& left, FxChain& right, int bus, float* l, float* r, int num);
+    static void processMasterPair (FxChain& left, FxChain& right, float* l, float* r, int num);
+
     /** Read parameters from the processor's APVTS on every process() call. */
     void bind (juce::AudioProcessorValueTreeState& apvts);
     void setSettings (const FxSettings& s) { cur = s; }
@@ -54,6 +60,7 @@ public:
 
 private:
     void applyEq (const FxSettings& s);
+    void eqBlock (float* x, int num);
     template <typename T> void link (juce::AudioProcessorValueTreeState&, const juce::String&, T&);
 
     double sr = 48000.0;
@@ -64,6 +71,7 @@ private:
     std::vector<std::pair<std::atomic<float>*, bool*>> bLinks;
 
     std::array<FxSlot, 4> slots;
+    std::vector<float> det;
 
     fxdsp::Biquad lowCut, ls, p1, p2, hs;
     std::array<float, 12> eqKey {};

@@ -88,7 +88,8 @@ add_executable(KickforgeTests
     tests/PresetTests.cpp
     tests/EngineTests.cpp
     tests/IoTests.cpp
-    tests/UiTests.cpp)
+    tests/UiTests.cpp
+    tests/HardeningTests.cpp)
 target_include_directories(KickforgeTests PRIVATE Source)
 target_compile_definitions(KickforgeTests PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)

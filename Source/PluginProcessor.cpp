@@ -140,18 +140,21 @@ void KickforgeProcessor::renderChunk (juce::AudioBuffer<float>& buffer, int star
     float* g = monoBuf.getWritePointer (0);
     for (int i = 0; i < n; ++i) g[i] = gainSm.getNextValue();
 
+    // Stereo-linked FX: Comp/FetComp slots, master compressor and limiter detect on max(|L|,|R|)
+    // and apply one gain to both channels (the image does not shift under gain reduction).
+    fx[0].beginBlock();
+    fx[1].beginBlock();
+    for (int bus = 0; bus < 2; ++bus)
+        kf::FxChain::processBusPair (fx[0], fx[1], bus, mixBuf.getWritePointer (2 + bus * 2),
+                                     mixBuf.getWritePointer (3 + bus * 2), n);
     for (int ch = 0; ch < 2; ++ch)
     {
-        auto& f = fx[(size_t) ch];
-        f.beginBlock();
         float* m = mixBuf.getWritePointer (ch);
-        float* a = mixBuf.getWritePointer (2 + ch);
-        float* b = mixBuf.getWritePointer (4 + ch);
-        f.processBus (0, a, n);
-        f.processBus (1, b, n);
+        const float* a = mixBuf.getReadPointer (2 + ch);
+        const float* b = mixBuf.getReadPointer (4 + ch);
         for (int i = 0; i < n; ++i) m[i] = (m[i] + a[i] + b[i]) * g[i]; // glob_gain BEFORE the limiter
-        f.processMaster (m, n);
     }
+    kf::FxChain::processMasterPair (fx[0], fx[1], mixBuf.getWritePointer (0), mixBuf.getWritePointer (1), n);
 
     auto mainOut = getBusBuffer (buffer, false, 0);
     const int chans = mainOut.getNumChannels();
