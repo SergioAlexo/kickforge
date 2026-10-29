@@ -47,7 +47,11 @@ set(KICKFORGE_ENGINE_SOURCES
     Source/presets/PresetBar.cpp
     Source/trigger/Trigger.cpp
     Source/analysis/KickAnalysis.cpp
-    Source/analysis/KickImport.cpp)
+    Source/analysis/KickImport.cpp
+    Source/analysis/KickMetrics.cpp)
+
+# kickforge-cli (AI link): everything except main()
+set(KICKFORGE_CLI_SOURCES Source/cli/CliCore.cpp)
 
 juce_add_plugin(Kickforge
     COMPANY_NAME "Kickforge"
@@ -94,7 +98,9 @@ add_executable(KickforgeTests
     tests/UiTests.cpp
     tests/HardeningTests.cpp
     tests/AnalysisTests.cpp
-    tests/PreviewTests.cpp)
+    tests/PreviewTests.cpp
+    tests/CliTests.cpp
+    ${KICKFORGE_CLI_SOURCES})
 target_include_directories(KickforgeTests PRIVATE Source)
 target_compile_definitions(KickforgeTests PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)
@@ -105,3 +111,20 @@ target_link_libraries(KickforgeTests PRIVATE
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags)
 add_test(NAME KickforgeTests COMMAND KickforgeTests)
+
+# ---- kickforge-cli.exe (console, headless engine; see docs/AI-LINK.md) ----
+add_executable(KickforgeCli
+    ${KICKFORGE_ENGINE_SOURCES}
+    ${KICKFORGE_CLI_SOURCES}
+    Source/cli/CliMain.cpp)
+set_target_properties(KickforgeCli PROPERTIES OUTPUT_NAME kickforge-cli)
+target_include_directories(KickforgeCli PRIVATE Source)
+target_compile_definitions(KickforgeCli PRIVATE
+    JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)
+target_link_libraries(KickforgeCli PRIVATE
+    juce::juce_audio_utils
+    juce::juce_dsp
+    juce::juce_recommended_config_flags
+    juce::juce_recommended_lto_flags
+    juce::juce_recommended_warning_flags)
+
