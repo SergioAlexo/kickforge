@@ -6,6 +6,7 @@
 #include "trigger/Trigger.h"
 #include <array>
 #include "ui/AudioFifo.h"
+#include "core/PreviewPlayer.h"
 
 class KickforgeProcessor : public juce::AudioProcessor
 {
@@ -48,6 +49,8 @@ public:
     kf::AudioFifo scopeFifo;
     /** UI-injected notes (Audition button); merged into the MIDI stream at the start of each block. */
     juce::MidiKeyboardState keyboardState;
+    /** Import-dialog audition: mixed into the main output after the FX chain. */
+    kf::PreviewPlayer preview;
 
 private:
     void handleMidi (const juce::MidiMessage&, int pos);

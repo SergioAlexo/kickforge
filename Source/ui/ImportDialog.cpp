@@ -34,81 +34,10 @@ struct ImportDialog::Loader : juce::Thread
     std::atomic<bool> finished { false };
 };
 
-// ------------------------------------------------------------------ audition (own output stream)
-struct ImportDialog::Player : juce::AudioIODeviceCallback
-{
-    ~Player() override { dm.removeAudioCallback (this); dm.closeAudioDevice(); }
-
-    bool start (std::vector<float> region, double srcRate)
-    {
-        {
-            const juce::SpinLock::ScopedLockType sl (lock);
-            data = std::move (region);
-            ratio = srcRate / outRate;
-            pos = 0.0;
-            playing.store (false);
-        }
-        if (! opened)
-        {
-            if (dm.initialise (0, 2, nullptr, true).isNotEmpty()) return false;
-            dm.addAudioCallback (this);
-            opened = true;
-        }
-        {
-            const juce::SpinLock::ScopedLockType sl (lock);
-            ratio = srcRate / outRate;
-            srcRateStored = srcRate;
-            pos = 0.0;
-            playing.store (true);
-        }
-        return true;
-    }
-    void stop() { playing.store (false); }
-
-    void audioDeviceAboutToStart (juce::AudioIODevice* d) override
-    {
-        const juce::SpinLock::ScopedLockType sl (lock);
-        outRate = d->getCurrentSampleRate();
-        if (outRate > 0 && srcRateStored > 0) ratio = srcRateStored / outRate;
-    }
-    void audioDeviceStopped() override {}
-    void audioDeviceIOCallbackWithContext (const float* const*, int, float* const* out, int numOut, int n,
-                                           const juce::AudioIODeviceCallbackContext&) override
-    {
-        for (int c = 0; c < numOut; ++c)
-            if (out[c] != nullptr) juce::FloatVectorOperations::clear (out[c], n);
-        if (! playing.load()) return;
-        const juce::SpinLock::ScopedTryLockType sl (lock);
-        if (! sl.isLocked() || data.empty()) return;
-        const double last = (double) data.size() - 1.0;
-        const double fade = std::max (1.0, 0.004 * srcRateStored); // 4 ms edge fades avoid clicks
-        for (int i = 0; i < n; ++i)
-        {
-            if (pos >= last) { playing.store (false); break; }
-            const int i0 = (int) pos;
-            const float fr = (float) (pos - i0);
-            float v = data[(size_t) i0] * (1.0f - fr) + data[(size_t) i0 + 1] * fr;
-            v *= (float) std::min ({ 1.0, pos / fade, (last - pos) / fade });
-            for (int c = 0; c < numOut; ++c)
-                if (out[c] != nullptr) out[c][i] = v * 0.8f;
-            pos += ratio;
-        }
-        progress.store ((float) (pos / std::max (1.0, last)));
-    }
-
-    juce::AudioDeviceManager dm;
-    juce::SpinLock lock;
-    std::vector<float> data;
-    double ratio = 1.0, pos = 0.0, outRate = 44100.0, srcRateStored = 44100.0;
-    std::atomic<bool> playing { false };
-    std::atomic<float> progress { 0.0f };
-    bool opened = false;
-};
-
 // ------------------------------------------------------------------ dialog
 ImportDialog::ImportDialog (const juce::File& source, std::function<void (const ImportOptions&)> onImport,
-                            std::function<void()> onCancel)
-    : file (source), importCb (std::move (onImport)), cancelCb (std::move (onCancel))
+                            std::function<void()> onCancel, PreviewPlayer* previewPlayer)
+    : file (source), importCb (std::move (onImport)), cancelCb (std::move (onCancel)), player (previewPlayer)
 {
     setWantsKeyboardFocus (true);
     for (auto* b : { &auditionBtn, &importBtn, &cancelBtn }) addAndMakeVisible (*b);
@@ -135,7 +64,7 @@ ImportDialog::~ImportDialog()
     alive->store (false);
     stopTimer();
     loader.reset();
-    player.reset();
+    stopAudition();
 }
 
 void ImportDialog::pollLoader()
@@ -170,7 +99,7 @@ void ImportDialog::updateButtons()
 {
     const bool ok = loaded && ! busy && regionEnd - regionStart >= 64;
     importBtn.setEnabled (ok);
-    auditionBtn.setEnabled (ok);
+    auditionBtn.setEnabled (ok && player != nullptr);
     cancelBtn.setEnabled (! busy);
     progressBar.setVisible (! loaded && error.isEmpty() ? true : busy);
 }
@@ -344,9 +273,9 @@ void ImportDialog::paint (juce::Graphics& g)
         g.drawText (juce::String ((int) i + 1), x + 3, waveArea.getY() + 10, 20, 14, juce::Justification::centredLeft);
     }
     // audition cursor
-    if (player != nullptr && player->playing.load())
+    if (player != nullptr && player->isPlaying())
     {
-        const int x = sampleToX (regionStart + (int) ((regionEnd - regionStart) * player->progress.load()));
+        const int x = sampleToX (regionStart + (int) ((regionEnd - regionStart) * player->getProgress()));
         g.setColour (juce::Colours::white);
         g.drawVerticalLine (x, (float) waveArea.getY(), (float) waveArea.getBottom());
     }
@@ -359,8 +288,8 @@ void ImportDialog::paint (juce::Graphics& g)
 
 void ImportDialog::timerCallback()
 {
-    if (! loaded || busy || (player != nullptr && player->playing.load())) repaint();
-    if (player != nullptr && ! player->playing.load() && auditionBtn.getButtonText() != "Audition")
+    if (! loaded || busy || (player != nullptr && player->isPlaying())) repaint();
+    if (player != nullptr && ! player->isPlaying() && auditionBtn.getButtonText() != "Audition")
         auditionBtn.setButtonText ("Audition");
 }
 
@@ -407,11 +336,12 @@ bool ImportDialog::keyPressed (const juce::KeyPress& k)
 
 void ImportDialog::toggleAudition()
 {
-    if (player != nullptr && player->playing.load()) { stopAudition(); return; }
+    if (player != nullptr && player->isPlaying()) { stopAudition(); return; }
     if (! loaded || regionEnd - regionStart < 64) return;
-    if (player == nullptr) player = std::make_unique<Player>();
+    if (player == nullptr) return;
     std::vector<float> region (mono.begin() + regionStart, mono.begin() + regionEnd);
-    if (player->start (std::move (region), sampleRate)) auditionBtn.setButtonText ("Stop");
+    player->play (std::move (region), sampleRate);
+    auditionBtn.setButtonText ("Stop");
 }
 
 void ImportDialog::stopAudition()

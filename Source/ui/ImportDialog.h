@@ -1,6 +1,7 @@
 #pragma once
 #include "KfLookAndFeel.h"
 #include "analysis/KickImport.h"
+#include "core/PreviewPlayer.h"
 #include <atomic>
 #include <functional>
 #include <memory>
@@ -12,14 +13,14 @@ ImportOptions importOptionsForRegion (int start, int end, int totalSamples);
 
 /** Modal-free import panel (P-08 UI): shows the loaded file's waveform with detected hits marked, the
     strongest pre-selected. Click a hit to select it, drag to highlight a custom region, audition the
-    selection, then Import (ImportOptions with regionStart/End) or Cancel.
+    selection (through the plugin's own output, see PreviewPlayer), then Import (ImportOptions with regionStart/End) or Cancel.
     File decoding + hit detection run on a background thread; the panel shows a progress bar meanwhile
     (and again while the owner runs the import itself, see setBusy). */
 class ImportDialog : public juce::Component, private juce::Timer
 {
 public:
     ImportDialog (const juce::File& source, std::function<void (const ImportOptions&)> onImport,
-                  std::function<void()> onCancel);
+                  std::function<void()> onCancel, PreviewPlayer* preview = nullptr);
     ~ImportDialog() override;
 
     /** Owner shows analysis progress after Import was pressed (disables the buttons). */
@@ -52,7 +53,6 @@ public:
 
 private:
     struct Loader;
-    struct Player;
 
     void timerCallback() override;
     void onLoaded (std::vector<float> data, double rate, std::vector<analysis::Hit> h, juce::String err);
@@ -68,7 +68,7 @@ private:
 
     std::shared_ptr<std::atomic<bool>> alive { std::make_shared<std::atomic<bool>> (true) };
     std::unique_ptr<Loader> loader;
-    std::unique_ptr<Player> player;
+    PreviewPlayer* player = nullptr; // plays through the plugin's own output (null = no audition)
     bool loaded = false, busy = false, dragging = false, dragInWave = false;
     juce::String error, busyText;
 

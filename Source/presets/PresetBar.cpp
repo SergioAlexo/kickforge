@@ -149,7 +149,7 @@ ui::ImportDialog* PresetBar::openImportDialog (const juce::File& f)
         [self]
         {
             juce::MessageManager::callAsync ([self] { if (self != nullptr) self->importDialog.reset(); });
-        });
+        }, &proc.preview);
     top->addAndMakeVisible (*importDialog);
     const int w = std::min (ui::ImportDialog::preferredW, top->getWidth() - 20);
     const int h = std::min (ui::ImportDialog::preferredH, top->getHeight() - 20);

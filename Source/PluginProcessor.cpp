@@ -27,6 +27,7 @@ void KickforgeProcessor::prepareToPlay (double sr, int block)
 {
     sub.prepare (sr, block);
     click.prepare (sr, block);
+    preview.prepare (sr);
     for (auto& f : fx) f.prepare (sr, block);
     maxChunk = std::max (16, block);
     mixBuf.setSize (6, maxChunk);
@@ -241,6 +242,8 @@ void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
 
     scopeFifo.push (buffer.getReadPointer (0), n);
+    auto mainOut = getBusBuffer (buffer, false, 0);
+    preview.process (mainOut);
     midi.clear();
     midi.addEvents (outMidi, 0, n, 0);
 }
