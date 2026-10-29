@@ -18,6 +18,7 @@ public:
         std::function<Curve()> get;
         std::function<void (const Curve&)> set;      // thread-safe setter of the owner
         std::function<void()> resetToDefault;
+        std::function<void (double t)> onLockHere;   // optional: "Phase lock here" (pitch curve)
         double vmin = 0.0, vmax = 1.0;               // default visible value range
         double hardMin = -1e9, hardMax = 1e9;        // node value limits
         std::function<double()> lengthMs;            // optional: time axis in ms

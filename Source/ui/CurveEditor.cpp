@@ -444,6 +444,7 @@ void CurveEditor::showMenu (int pi, int si, juce::Point<float> where)
         m.addItem (2, "Linear segment after point", pi < curve.size() - 1);
         m.addItem (3, src.snapValue ? "Snap value to note" : "Snap value to grid");
         m.addItem (4, "Snap time to grid", pi > 0 && pi < curve.size() - 1);
+        if (src.onLockHere) m.addItem (9, "Phase lock here");
     }
     else
     {
@@ -487,6 +488,7 @@ void CurveEditor::showMenu (int pi, int si, juce::Point<float> where)
                                  c.commit();
                                  break;
                              }
+                             case 9: if (c.src.onLockHere && pi >= 0) c.src.onLockHere (c.curve.getPoints()[(size_t) pi].time); break;
                              case 5: c.addPointAt (where.x, where.y); break;
                              case 6: c.undo(); break;
                              case 7: c.redo(); break;

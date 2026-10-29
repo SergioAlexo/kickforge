@@ -74,6 +74,7 @@ class Choice : public juce::ComboBox
 public:
     Choice (APVTS& state, const juce::String& paramId)
     {
+        setName (paramId);
         if (auto* p = dynamic_cast<juce::AudioParameterChoice*> (state.getParameter (paramId)))
             addItemList (p->choices, 1);
         attachment = std::make_unique<APVTS::ComboBoxAttachment> (state, paramId, *this);
@@ -89,6 +90,7 @@ class Toggle : public juce::ToggleButton
 public:
     Toggle (APVTS& state, const juce::String& paramId, const juce::String& text)
     {
+        setName (paramId);
         setButtonText (text);
         attachment = std::make_unique<APVTS::ButtonAttachment> (state, paramId, *this);
     }

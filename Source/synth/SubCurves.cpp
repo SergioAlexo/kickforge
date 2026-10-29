@@ -16,36 +16,46 @@ const char* subCurveName (SubCurveId id) noexcept
     return "";
 }
 
-// Tension: <0 fast start / slow end, >0 slow start / fast end.
+// Shapes are written as chains of near-linear segments sampled from exponentials: a single
+// segment with negative tension starts with a vertical tangent, which looks (and sounds) like a
+// cliff, so the fast-then-slow decays here use several nodes with tension 0 instead.
 Curve defaultPitchCurveSemitones()
 {
     // ~ +31 st (about 6x) at the hit, thump-fall to +6 st by 8% of the length (40 ms at 500 ms),
-    // settle at the base pitch.
-    return Curve ({ { 0.0, 31.0, -0.3 }, { 0.08, 6.0, -0.4 }, { 0.30, 0.0, 0.0 }, { 1.0, 0.0, 0.0 } });
+    // then a gentle glide down to the base pitch.
+    return Curve ({ { 0.0, 31.0, 0.0 }, { 0.01, 22.0, 0.0 }, { 0.03, 12.0, 0.0 }, { 0.08, 6.0, 0.0 },
+                    { 0.16, 2.0, 0.0 }, { 0.30, 0.0, 0.0 }, { 1.0, 0.0, 0.0 } });
 }
 
 Curve defaultPitchCurveHz()
 {
     // Reference: 55 Hz base (sub_root A1). Same shape as above, in Hz.
-    return Curve ({ { 0.0, 330.0, -0.3 }, { 0.08, 78.0, -0.4 }, { 0.30, 55.0, 0.0 }, { 1.0, 55.0, 0.0 } });
+    return Curve ({ { 0.0, 330.0, 0.0 }, { 0.01, 196.0, 0.0 }, { 0.03, 110.0, 0.0 }, { 0.08, 78.0, 0.0 },
+                    { 0.16, 62.0, 0.0 }, { 0.30, 55.0, 0.0 }, { 1.0, 55.0, 0.0 } });
 }
 
 Curve defaultAmpCurve()
 {
-    return Curve ({ { 0.0, 1.0, 0.35 }, { 0.30, 0.82, -0.6 }, { 1.0, 0.0, 0.0 } });
+    // Full-level hold for the punch (10% of the length), then a smooth exponential decay
+    // (~ -44 dB over the remaining 90%) that reaches silence at the end of the layer.
+    return Curve ({ { 0.0, 1.0, 0.0 }, { 0.10, 1.0, 0.0 }, { 0.20, 0.574, 0.0 }, { 0.35, 0.249, 0.0 },
+                    { 0.55, 0.082, 0.0 }, { 0.75, 0.027, 0.0 }, { 1.0, 0.0, 0.0 } });
 }
 
 Curve defaultDriveCurve()
 {
-    // Drive hardest on the transient, relaxing toward the tail.
-    return Curve ({ { 0.0, 1.0, -0.6 }, { 0.25, 0.25, 0.0 }, { 1.0, 0.0, 0.0 } });
+    // Drive hardest on the transient, relaxing exponentially toward the tail.
+    return Curve ({ { 0.0, 1.0, 0.0 }, { 0.05, 0.62, 0.0 }, { 0.12, 0.38, 0.0 }, { 0.25, 0.2, 0.0 },
+                    { 0.5, 0.07, 0.0 }, { 1.0, 0.0, 0.0 } });
 }
 
 Curve defaultHarmAmountCurve()
 {
-    return Curve ({ { 0.0, 1.0, -0.5 }, { 0.5, 0.35, 0.0 }, { 1.0, 0.0, 0.0 } });
+    return Curve ({ { 0.0, 1.0, 0.0 }, { 0.1, 0.7, 0.0 }, { 0.25, 0.5, 0.0 }, { 0.5, 0.3, 0.0 },
+                    { 0.75, 0.12, 0.0 }, { 1.0, 0.0, 0.0 } });
 }
 
+/** Selective key tracking (S-15): per-time weight 0..1 of how much the MIDI note transposes the pitch. */
 Curve defaultKeyTrackCurve()
 {
     return Curve ({ { 0.0, 1.0, 0.0 }, { 1.0, 1.0, 0.0 } });

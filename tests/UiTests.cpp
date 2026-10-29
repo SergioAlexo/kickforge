@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <cmath>
+#include <set>
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
 #include "ui/Analyser.h"
@@ -140,14 +141,14 @@ TEST_CASE ("Editor constructs and paints offscreen at several sizes")
     for (int w : { 560, 1120, 1680 })
     {
         ed->setSize (w, (int) std::lround (w * (double) KickforgeEditor::designH / KickforgeEditor::designW));
-        for (int tab = 0; tab < 6; ++tab)
+        for (int tab = 0; tab < 7; ++tab)
         {
             ke->selectTab (tab);
             auto img = ed->createComponentSnapshot (ed->getLocalBounds(), false, 0.5f);
             REQUIRE (img.isValid());
         }
     }
-    for (int c = 0; c < 8; ++c) ke->selectCurve (c);
+    for (int c = 0; c < 9; ++c) ke->selectCurve (c);
 
     // curve editing goes through the thread-safe setters
     ke->selectCurve (1);
@@ -163,8 +164,8 @@ TEST_CASE ("Editor constructs and paints offscreen at several sizes")
     if (auto dir = juce::SystemStats::getEnvironmentVariable ("KF_UI_SNAPSHOT_DIR", {}); dir.isNotEmpty())
     {
         ed->setSize (KickforgeEditor::designW, KickforgeEditor::designH);
-        const char* names[] = { "sub", "click", "fx", "eq", "dyn", "global" };
-        for (int tab = 0; tab < 6; ++tab)
+        const char* names[] = { "sub", "harmonics", "click", "fx", "eq", "dyn", "global" };
+        for (int tab = 0; tab < 7; ++tab)
         {
             ke->selectTab (tab);
             auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
@@ -173,5 +174,59 @@ TEST_CASE ("Editor constructs and paints offscreen at several sizes")
             juce::FileOutputStream os (f);
             if (os.openedOk()) { os.setPosition (0); os.truncate(); juce::PNGImageFormat().writeImageToStream (img, os); }
         }
+        for (int c : { 0, 2, 3, 4 })
+        {
+            ke->selectCurve (c);
+            auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
+            juce::File f = juce::File (dir).getChildFile ("ui_curve" + juce::String (c) + ".png");
+            juce::FileOutputStream os (f);
+            if (os.openedOk()) { os.setPosition (0); os.truncate(); juce::PNGImageFormat().writeImageToStream (img, os); }
+        }
     }
+}
+
+namespace
+{
+void collectBoundNames (juce::Component& c, std::set<juce::String>& out)
+{
+    if (dynamic_cast<juce::Slider*> (&c) || dynamic_cast<juce::ComboBox*> (&c) || dynamic_cast<juce::ToggleButton*> (&c))
+        out.insert (c.getName());
+    for (auto* ch : c.getChildren())
+        collectBoundNames (*ch, out);
+}
+}
+
+TEST_CASE ("Every non-hidden parameter is bound by an editor control")
+{
+    juce::ScopedJuceInitialiser_GUI gui;
+    KickforgeProcessor proc;
+    proc.prepareToPlay (48000.0, 512);
+    std::unique_ptr<juce::AudioProcessorEditor> ed (proc.createEditor());
+    std::set<juce::String> bound;
+    collectBoundNames (*ed, bound);
+
+    std::vector<juce::String> missing;
+    for (auto* p : proc.getParameters())
+        if (auto* wp = dynamic_cast<juce::RangedAudioParameter*> (p))
+            if (! wp->isMetaParameter() && wp->isAutomatable() && bound.count (wp->getParameterID()) == 0)
+                missing.push_back (wp->getParameterID());
+    INFO ("unbound: " << juce::StringArray (missing.data(), (int) missing.size()).joinIntoString (", ").toStdString());
+    REQUIRE (missing.empty());
+}
+
+TEST_CASE ("Default sub curves are smooth: no near-vertical drops")
+{
+    for (auto id : { SubCurveId::Pitch, SubCurveId::Amp, SubCurveId::Drive, SubCurveId::HarmAmount })
+    {
+        const auto& pts = (id == SubCurveId::Pitch ? defaultPitchCurveSemitones()
+                         : id == SubCurveId::Amp ? defaultAmpCurve()
+                         : id == SubCurveId::Drive ? defaultDriveCurve() : defaultHarmAmountCurve()).getPoints();
+        for (size_t i = 1; i < pts.size(); ++i)
+            REQUIRE (pts[i].time - pts[i - 1].time >= 0.009);
+    }
+    const auto a = defaultAmpCurve();
+    // no step larger than 0.1 of full scale within any 2% of the length after the hold
+    for (double t = 0.1; t < 0.98; t += 0.01)
+        REQUIRE (std::abs (a.eval (t) - a.eval (t + 0.02)) < 0.15);
+    REQUIRE (a.eval (0.05) == 1.0);
 }
