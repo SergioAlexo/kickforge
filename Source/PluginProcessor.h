@@ -5,6 +5,7 @@
 #include "fx/FxChain.h"
 #include "trigger/Trigger.h"
 #include <array>
+#include "ui/AudioFifo.h"
 
 class KickforgeProcessor : public juce::AudioProcessor
 {
@@ -41,6 +42,12 @@ public:
     kf::SubCurves& getSubCurves() noexcept { return subCurves; }
     /** Click/sample layers (presets/export: sample load + wait). */
     kf::ClickLayer& getClickLayer() noexcept { return click; }
+
+    // ---- UI hooks (Source/ui) ----
+    /** Final mono output, pushed from processBlock for the scope / analyser. */
+    kf::AudioFifo scopeFifo;
+    /** UI-injected notes (Audition button); merged into the MIDI stream at the start of each block. */
+    juce::MidiKeyboardState keyboardState;
 
 private:
     void handleMidi (const juce::MidiMessage&, int pos);

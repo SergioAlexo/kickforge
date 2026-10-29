@@ -194,6 +194,7 @@ void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 {
     juce::ScopedNoDenormals noDenormals;
     const int n = buffer.getNumSamples();
+    keyboardState.processNextMidiBuffer (midi, 0, n, true);
 
     // G-06..G-10: the sidechain input shares channels with the output, so detect before clearing.
     trigPtrs.read (trigSet);
@@ -235,6 +236,8 @@ void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     flushMidiOut (n);          // note-offs that fall inside this block
     if (moPending) moPendIn -= n;
 
+
+    scopeFifo.push (buffer.getReadPointer (0), n);
     midi.clear();
     midi.addEvents (outMidi, 0, n, 0);
 }
