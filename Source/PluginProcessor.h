@@ -3,6 +3,7 @@
 #include "synth/SubVoice.h"
 #include "click/ClickLayer.h"
 #include "fx/FxChain.h"
+#include "trigger/Trigger.h"
 #include <array>
 
 class KickforgeProcessor : public juce::AudioProcessor
@@ -21,7 +22,7 @@ public:
 
     const juce::String getName() const override { return "Kickforge"; }
     bool acceptsMidi() const override { return true; }
-    bool producesMidi() const override { return false; }
+    bool producesMidi() const override { return true; }
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 2.0; }
 
@@ -40,10 +41,11 @@ public:
     kf::SubCurves& getSubCurves() noexcept { return subCurves; }
 
 private:
-    void handleMidi (const juce::MidiMessage&);
+    void handleMidi (const juce::MidiMessage&, int pos);
+    void flushMidiOut (int upTo);
     void renderBlock (juce::AudioBuffer<float>&, int start, int num);
     void renderChunk (juce::AudioBuffer<float>&, int start, int n);
-    void addRouted (int bus, float pan, int n);
+    void addRouted (int bus, float pan, int n, int stem);
 
     kf::SubCurves subCurves { apvts };
     kf::SubVoice sub;
@@ -55,4 +57,20 @@ private:
     juce::AudioBuffer<float> mixBuf, monoBuf;
     int maxChunk = 0;
     juce::SmoothedValue<float> gainSm;
+
+    // G-13 stems (pre-FX, panned): channels 0/1 sub, 2/3 click layers; written only when the aux outputs are enabled.
+    juce::AudioBuffer<float> stemBuf;
+    bool stemsOn[2] = { false, false };
+
+    // G-06..G-10 sidechain trigger
+    kf::TriggerParamPtrs trigPtrs;
+    kf::TriggerSettings trigSet;
+    kf::TriggerDetector trigDet;
+    std::array<kf::TriggerDetector::Event, kf::TriggerDetector::kMaxEvents> trigEvents;
+    juce::MidiBuffer mergedMidi, outMidi;
+
+    // G-11 MIDI out
+    std::atomic<float> *moEnable = nullptr, *moFollow = nullptr, *moNote = nullptr, *moChan = nullptr, *moLen = nullptr;
+    bool moPending = false;
+    int moPendNote = 0, moPendChan = 1, moPendIn = 0; // moPendIn: samples from the start of the current block
 };

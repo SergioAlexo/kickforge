@@ -92,15 +92,15 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [x] G-03 Mono / polyphony behavior (unverified; plan: mono with declick, retrigger)
 - [x] G-04 Glide / portamento (unverified; no source mentions it)
 - [x] G-05 Pitch-bend response (unverified)
-- [ ] G-06 Trigger tab: external sidechain input for drum replacement
-- [ ] G-07 Trigger input filter
-- [ ] G-08 Trigger Threshold
-- [ ] G-09 Trigger Off Return (release threshold)
-- [ ] G-10 Trigger Retrigger Return (re-arm hysteresis)
-- [ ] G-11 Output MIDI notes to drive other instruments (single low-quality source; unverified)
+- [x] G-06 Trigger tab: external sidechain input for drum replacement
+- [x] G-07 Trigger input filter
+- [x] G-08 Trigger Threshold
+- [x] G-09 Trigger Off Return (release threshold)
+- [x] G-10 Trigger Retrigger Return (re-arm hysteresis)
+- [x] G-11 Output MIDI notes to drive other instruments (single low-quality source; unverified)
 - [x] G-12 Host automation of all parameters (users requested full automation exposure; unverified as present)
-- [ ] G-13 Output routing: single stereo out (multi-out unverified)
-- [ ] G-14 Formats: VST3 (AU/AAX out of scope for us)
+- [x] G-13 Output routing: single stereo out (multi-out unverified)
+- [x] G-14 Formats: VST3 (AU/AAX out of scope for us)
 
 ## U - UI
 - [ ] U-01 Resizable plugin window
