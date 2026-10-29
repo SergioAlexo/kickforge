@@ -38,6 +38,8 @@ public:
 
     /** Sub-layer pitch/amp/... curves (thread-safe swap, mirrored into apvts.state "CURVES"). */
     kf::SubCurves& getSubCurves() noexcept { return subCurves; }
+    /** Click/sample layers (presets/export: sample load + wait). */
+    kf::ClickLayer& getClickLayer() noexcept { return click; }
 
     // ---- UI hooks (Source/ui) ----
     kf::ClickLayer& getClick() noexcept { return click; }
