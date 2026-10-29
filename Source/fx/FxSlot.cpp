@@ -65,15 +65,20 @@ void FxSlot::setParams (int type, float na, float nb, float nc, float nmix, bool
     aS.setTargetValue (na); bS.setTargetValue (nb); cS.setTargetValue (nc); mixS.setTargetValue (nmix);
 }
 
-void FxSlot::process (float* x, int n)
+void FxSlot::process (float* x, int n) { process (x, n, nullptr); }
+
+void FxSlot::process (float* x, int n, const float* det)
 {
     if (curType == Off) return;
     while (n > 0)
     {
         const int m = std::min (n, kChunk);
+        sidePtr = det;
         runChunk (x, m);
         x += m; n -= m;
+        if (det != nullptr) det += m;
     }
+    sidePtr = nullptr;
 }
 
 void FxSlot::runChunk (float* x, int m)
@@ -294,13 +299,13 @@ void FxSlot::shape (float* p, int m, double fs)
             for (int i = 0; i < m; ++i) p[i] = eqHs.process (eqPk.process (eqLs.process (sane (p[i]))));
             break;
         case Comp:
-            for (int i = 0; i < m; ++i) { const float x = sane (p[i]); p[i] = x * comp.process (x); }
+            for (int i = 0; i < m; ++i) { const float x = sane (p[i]); p[i] = x * comp.process (sidePtr != nullptr ? sane (sidePtr[i]) : x); }
             break;
         case FetComp:
             for (int i = 0; i < m; ++i)
             {
                 const float x = sane (p[i]) * fetIn;
-                const float y = x * comp.process (x);
+                const float y = x * comp.process (sidePtr != nullptr ? sane (sidePtr[i]) * fetIn : x);
                 p[i] = std::tanh (y * 0.5f) * 2.0f * fetOut;
             }
             break;

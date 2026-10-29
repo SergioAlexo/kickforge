@@ -32,6 +32,10 @@ public:
     /** osIndex: 0 = off, 1 = 2x, 2 = 4x, 3 = 8x. Call before process() each block. */
     void setParams (int type, float a, float b, float c, float mix, bool bypass, int osIndex);
     void process (float* x, int n);
+    /** Stereo link for Comp/FetComp: `det` (n samples, raw max(|L|,|R|) of the slot input) replaces the own-channel
+        detector, so both channels' slots compute identical gain. Pass nullptr for independent operation. */
+    void process (float* x, int n, const float* det);
+    bool isDynamics() const { return curType == Comp || curType == FetComp; }
 
     static bool isOversampled (int t) { return (t >= Clipper && t <= Complex && t != BitCrush) || t == Brassify; }
 
@@ -69,6 +73,7 @@ private:
     fxdsp::DynComp comp;
     float fetIn = 1, fetOut = 1;
 
+    const float* sidePtr = nullptr;
     std::array<float, kChunk> dry {};
 };
 }

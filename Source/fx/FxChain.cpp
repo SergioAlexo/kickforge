@@ -47,9 +47,10 @@ void FxChain::bind (juce::AudioProcessorValueTreeState& apvts)
     bound = true;
 }
 
-void FxChain::prepare (double sampleRate, int)
+void FxChain::prepare (double sampleRate, int maxBlock)
 {
     sr = sampleRate;
+    det.assign ((size_t) std::max (16, maxBlock), 0.0f);
     for (auto& s : slots) s.prepare (sr);
     comp.prepare (sr);
     limiter.prepare (sr);
@@ -117,12 +118,9 @@ void FxChain::process (juce::AudioBuffer<float>& buffer, int start, int num)
     processMaster (x, num);
 }
 
-void FxChain::processMaster (float* x, int num)
+void FxChain::eqBlock (float* x, int num)
 {
-    if (num <= 0) return;
     const FxSettings& s = blk;
-
-    // master EQ
     if (! s.eqBypass)
     {
         if (! eqWasOn) { for (auto* b : { &lowCut, &ls, &p1, &p2, &hs }) b->reset(); eqKey.fill (-1.0e9f); }
@@ -136,6 +134,85 @@ void FxChain::processMaster (float* x, int num)
         }
     }
     eqWasOn = ! s.eqBypass;
+}
+
+void FxChain::processBusPair (FxChain& L, FxChain& R, int bus, float* l, float* r, int num)
+{
+    while (num > 0)
+    {
+        const int n = std::min (num, (int) L.det.size());
+        for (size_t i = (size_t) bus * 2; i < (size_t) bus * 2 + 2 && i < 4; ++i)
+        {
+            const auto& d = L.blk.slot[i];
+            L.slots[i].setParams (d.type, d.a, d.b, d.c, d.mix, d.bypass, L.blk.quality);
+            const auto& e = R.blk.slot[i];
+            R.slots[i].setParams (e.type, e.a, e.b, e.c, e.mix, e.bypass, R.blk.quality);
+            if (L.slots[i].isDynamics() && R.slots[i].isDynamics())
+            {
+                for (int k = 0; k < n; ++k)
+                {
+                    const float a = std::abs (l[k]), b = std::abs (r[k]);
+                    L.det[(size_t) k] = std::max (std::isfinite (a) ? a : 0.0f, std::isfinite (b) ? b : 0.0f);
+                }
+                L.slots[i].process (l, n, L.det.data());
+                R.slots[i].process (r, n, L.det.data());
+            }
+            else
+            {
+                L.slots[i].process (l, n);
+                R.slots[i].process (r, n);
+            }
+        }
+        l += n; r += n; num -= n;
+    }
+}
+
+void FxChain::processMasterPair (FxChain& L, FxChain& R, float* l, float* r, int num)
+{
+    if (num <= 0) return;
+    L.eqBlock (l, num);
+    R.eqBlock (r, num);
+
+    const FxSettings& s = L.blk;
+    if (! s.compBypass)
+    {
+        auto& comp = L.comp;
+        if (! L.compWasOn) comp.gr = 0;
+        comp.thr = s.compThr; comp.ratio = s.compRatio; comp.knee = 6.0f;
+        comp.setTimes (s.compAtt, s.compRel);
+        const float mk = fxdsp::dbToLin (s.compMakeup);
+        for (int i = 0; i < num; ++i)
+        {
+            const float dl = l[i], dr = r[i];
+            const float gain = comp.process (std::max (std::abs (dl), std::abs (dr))) * mk;
+            l[i] = dl + s.compMix * (dl * gain - dl);
+            r[i] = dr + s.compMix * (dr * gain - dr);
+        }
+    }
+    L.compWasOn = ! s.compBypass;
+
+    L.outGain.setTargetValue (fxdsp::dbToLin (s.outDb));
+    L.limInGain.setTargetValue (fxdsp::dbToLin (s.limIn));
+    L.limiter.setLookahead (Limiter::lookaheadSamples (s.limLook, L.sr));
+    L.limiter.setRelease (s.limRel);
+    const float ceil = fxdsp::dbToLin (s.limCeil);
+    for (int i = 0; i < num; ++i)
+    {
+        const float og = L.outGain.getNextValue(), ig = L.limInGain.getNextValue();
+        float a = l[i] * og, b = r[i] * og;
+        if (! std::isfinite (a)) a = 0.0f;
+        if (! std::isfinite (b)) b = 0.0f;
+        L.limiter.process2 (a, b, ig, ceil, s.limSat, s.limBypass);
+        l[i] = a; r[i] = b;
+    }
+}
+
+void FxChain::processMaster (float* x, int num)
+{
+    if (num <= 0) return;
+    const FxSettings& s = blk;
+
+    eqBlock (x, num);
 
     // master compressor
     if (! s.compBypass)

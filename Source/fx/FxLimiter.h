@@ -20,6 +20,7 @@ public:
         sr = sampleRate;
         maxL = (int) std::ceil (0.005 * sr) + 2;
         delay.assign ((size_t) maxL + 2, 0.0f);
+        delay2.assign ((size_t) maxL + 2, 0.0f);
         rbuf.assign ((size_t) maxL + 2, 1.0f);
         dqVal.assign ((size_t) maxL + 4, 1.0f);
         dqIdx.assign ((size_t) maxL + 4, 0);
@@ -49,6 +50,7 @@ public:
     void reset()
     {
         std::fill (delay.begin(), delay.end(), 0.0f);
+        std::fill (delay2.begin(), delay2.end(), 0.0f);
         std::fill (rbuf.begin(), rbuf.end(), 1.0f);
         w = 0; ri = 0; sum = (double) (L + 1); r = 1.0f;
         head = 0; size = 0; counter = 0;
@@ -69,7 +71,34 @@ public:
             return delayed;
         }
 
-        const float a = std::abs (in);
+        const float avg = gainStep (std::abs (in), ceiling);
+        return std::clamp (delayed * avg, -ceiling, ceiling);
+    }
+
+    /** Stereo-linked variant: detection = max(|L|,|R|), identical gain applied to both channels. */
+    void process2 (float& xl, float& xr, float inGain, float ceiling, float sat, bool bypass)
+    {
+        const int dsz = L + 1;
+        float inL = bypass ? xl : xl * inGain, inR = bypass ? xr : xr * inGain;
+        if (! bypass && sat > 0.0f)
+        {
+            inL = inL * (1.0f - sat) + sat * ceiling * std::tanh (inL / ceiling);
+            inR = inR * (1.0f - sat) + sat * ceiling * std::tanh (inR / ceiling);
+        }
+        delay[(size_t) w] = inL;
+        delay2[(size_t) w] = inR;
+        const float dl = delay[(size_t) ((w + 1) % dsz)], dr = delay2[(size_t) ((w + 1) % dsz)];
+        w = (w + 1) % dsz;
+        if (bypass) { counter++; xl = dl; xr = dr; return; }
+        const float avg = gainStep (std::max (std::abs (inL), std::abs (inR)), ceiling);
+        xl = std::clamp (dl * avg, -ceiling, ceiling);
+        xr = std::clamp (dr * avg, -ceiling, ceiling);
+    }
+
+private:
+    float gainStep (float a, float ceiling)
+    {
+        const int dsz = L + 1;
         const float q = a > ceiling ? ceiling / a : 1.0f;
         const int cap = (int) dqVal.size();
         while (size > 0 && dqVal[(size_t) ((head + size - 1) % cap)] >= q) --size;
@@ -84,17 +113,15 @@ public:
         sum += (double) r - (double) rbuf[(size_t) ri];
         rbuf[(size_t) ri] = r;
         ri = (ri + 1) % dsz;
-        const float avg = (float) (sum / (double) dsz);
-        return std::clamp (delayed * std::min (avg, 1.0f), -ceiling, ceiling);
+        return std::min ((float) (sum / (double) dsz), 1.0f);
     }
 
-private:
     double sr = 48000.0;
     int maxL = 0, L = 0, w = 0, ri = 0, head = 0, size = 0;
     int64_t counter = 0;
     double sum = 0;
     float r = 1.0f, relCoef = 0.01f;
-    std::vector<float> delay, rbuf, dqVal;
+    std::vector<float> delay, delay2, rbuf, dqVal;
     std::vector<int64_t> dqIdx;
 };
 }
