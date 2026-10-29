@@ -156,6 +156,7 @@ CurveEditor::Source KickforgeEditor::makeSource (int index)
             const bool hz = raw ("sub_pitchmode") > 0.5;
             s.vmin = hz ? 0.0 : -12.0;
             s.vmax = hz ? 400.0 : 48.0;
+            s.fitToCurve = true;
             s.hardMin = hz ? 10.0 : -60.0;
             s.hardMax = hz ? 4000.0 : 96.0;
             s.unit = hz ? "Hz" : "st";

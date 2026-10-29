@@ -39,8 +39,23 @@ void CurveEditor::fitView()
     view.t0 = 0.0;
     view.t1 = 1.0;
     double lo = src.vmin, hi = src.vmax;
-    for (auto& p : curve.getPoints()) { lo = std::min (lo, p.value); hi = std::max (hi, p.value); }
-    const double pad = (hi - lo) * 0.06;
+    if (src.fitToCurve && ! curve.empty())
+    {
+        double clo = 1e300, chi = -1e300;
+        for (auto& p : curve.getPoints()) { clo = std::min (clo, p.value); chi = std::max (chi, p.value); }
+        const double defSpan = std::max (1e-6, src.vmax - src.vmin);
+        if (chi - clo < defSpan * 0.05) // (nearly) flat: keep the default framing but include the curve
+        {
+            lo = std::min (lo, clo); hi = std::max (hi, chi);
+        }
+        else
+        {
+            lo = clo; hi = chi;
+        }
+    }
+    else
+        for (auto& p : curve.getPoints()) { lo = std::min (lo, p.value); hi = std::max (hi, p.value); }
+    const double pad = (hi - lo) * (src.fitToCurve ? 0.12 : 0.06);
     view.vBottom = lo - pad;
     view.vTop = hi + pad;
     repaint();
@@ -74,7 +89,7 @@ void CurveEditor::timerCallback()
     redoBtn.setEnabled (! redoStack.empty());
     if (drag != Drag::none || ! src.get) return;
     auto c = src.get();
-    if (! (c == curve)) { curve = std::move (c); selected = -1; repaint(); }
+    if (! (c == curve)) { curve = std::move (c); selected = -1; if (src.fitToCurve) fitView(); repaint(); }
 }
 
 void CurveEditor::commit()

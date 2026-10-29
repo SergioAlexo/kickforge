@@ -286,3 +286,29 @@ TEST_CASE ("Harmonic gain knob range: off at the minimum, -12 dB mid, 0 dB to th
     REQUIRE (s->getTextFromValue (-60.0) == "Off");
     REQUIRE ((bool) s->getProperties()["unipolar"]);
 }
+
+TEST_CASE ("Selecting the pitch curve fits the view to its value range")
+{
+    juce::ScopedJuceInitialiser_GUI gui;
+    KickforgeProcessor proc;
+    proc.prepareToPlay (48000.0, 512);
+    std::unique_ptr<juce::AudioProcessorEditor> ed (proc.createEditor());
+    auto* ke = dynamic_cast<KickforgeEditor*> (ed.get());
+    REQUIRE (ke != nullptr);
+    ke->selectCurve (1);
+    ke->selectCurve (0);
+    auto& ce = ke->getCurveEditor();
+    double lo = 1e9, hi = -1e9;
+    for (auto& p : ce.getCurve().getPoints()) { lo = std::min (lo, p.value); hi = std::max (hi, p.value); }
+    REQUIRE (hi - lo > 10.0);
+    REQUIRE (ce.view.vBottom <= lo);
+    REQUIRE (ce.view.vTop >= hi);
+    REQUIRE ((ce.view.vTop - ce.view.vBottom) < (hi - lo) * 1.35); // tight, not the old -12..48
+    // an externally loaded (very different) curve refits on the next timer tick path: Fit does the same
+    proc.getSubCurves().setCurve (SubCurveId::Pitch, Curve ({ { 0.0, 60.0, 0.0 }, { 1.0, 0.0, 0.0 } }));
+    ke->selectCurve (0); // re-select = reload from the processor
+    REQUIRE (ce.view.vTop >= 60.0);
+    // zooming out stays possible: view limits are not clamped
+    ce.view.vBottom -= 100;
+    REQUIRE (ce.view.vBottom < -90);
+}
