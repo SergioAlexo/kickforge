@@ -15,10 +15,35 @@ void WaveformView::paint (juce::Graphics& g)
     g.setColour (line);
     g.drawHorizontalLine ((int) r.getCentreY(), r.getX(), r.getRight());
 
+    // ---- reference (AI link), shown dimmed; onset = first sample above the analyser's capture threshold
+    double refRate = 0.0;
+    std::shared_ptr<const std::vector<float>> ref;
+    float refGain = 1.0f;
+    if (reference != nullptr && reference->hasAudio())
+    {
+        ref = reference->getDisplay (refRate);
+        refGain = juce::Decibels::decibelsToGain (reference->getInfo().gainDb, -60.0f);
+    }
+    if (ref != nullptr && ref != refCache)
+    {
+        refCache = ref;
+        refOnset = 0;
+        refPeak = 0.0f;
+        for (size_t i = 0; i < ref->size(); ++i)
+        {
+            const float a = std::abs ((*ref)[i]);
+            if (refPeak == 0.0f && a > 0.02f) refOnset = (int) i;
+            refPeak = std::max (refPeak, a);
+        }
+    }
+    else if (ref == nullptr)
+        refCache.reset();
+
     g.setFont (juce::Font (juce::FontOptions (11.0f)));
     g.setColour (dim);
     const auto& k = analyser.getKick();
-    if (k.empty())
+    const bool haveRef = ref != nullptr && refRate > 0.0 && refPeak > 0.0f;
+    if (k.empty() && ! haveRef)
     {
         g.drawText ("OUTPUT  -  play a note or press Audition", getLocalBounds().removeFromTop (18).reduced (8, 0),
                     juce::Justification::centredLeft);
@@ -26,28 +51,66 @@ void WaveformView::paint (juce::Graphics& g)
     }
     float peak = 0.0f;
     for (float s : k) peak = std::max (peak, std::abs (s));
-    const double ms = 1000.0 * (double) k.size() / analyser.getSampleRate();
-    g.drawText ("OUTPUT   peak " + juce::String (juce::Decibels::gainToDecibels (peak, -99.0f), 1) + " dBFS   " +
-                    juce::String ((int) ms) + " ms",
-                getLocalBounds().removeFromTop (18).reduced (8, 0), juce::Justification::centredLeft);
+    const double sr = analyser.getSampleRate();
+    double ms = k.empty() ? 0.0 : 1000.0 * (double) k.size() / sr;
+    if (! k.empty())
+        g.drawText ("OUTPUT   peak " + juce::String (juce::Decibels::gainToDecibels (peak, -99.0f), 1) + " dBFS   " +
+                        juce::String ((int) ms) + " ms",
+                    getLocalBounds().removeFromTop (18).reduced (8, 0), juce::Justification::centredLeft);
+    else
+        g.drawText ("OUTPUT  -  play a note to compare", getLocalBounds().removeFromTop (18).reduced (8, 0),
+                    juce::Justification::centredLeft);
 
-    const float scale = 1.0f / std::max (0.25f, peak);
     const int w = (int) r.getWidth();
-    juce::Path p;
-    const double per = (double) k.size() / w;
-    for (int x = 0; x < w; ++x)
+    // time span shown: the kick; with no kick yet, the reference
+    const double spanSec = k.empty() ? std::min (1.5, (double) (ref->size() - (size_t) refOnset) / refRate)
+                                     : (double) k.size() / sr;
+    float refVisPeak = 0.0f;
+    if (haveRef)
     {
-        const size_t a = (size_t) (x * per), e = std::min (k.size(), (size_t) ((x + 1) * per) + 1);
-        float lo = 0, hi = 0;
-        for (size_t i = a; i < e; ++i) { lo = std::min (lo, k[i]); hi = std::max (hi, k[i]); }
-        const float px = r.getX() + (float) x;
-        p.addLineSegment (juce::Line<float> (px, r.getCentreY() - hi * scale * r.getHeight() * 0.5f,
-                                             px, r.getCentreY() - lo * scale * r.getHeight() * 0.5f - 0.5f), 0.5f);
+        const size_t lim = std::min (ref->size(), (size_t) refOnset + (size_t) (spanSec * refRate) + 1);
+        for (size_t i = (size_t) refOnset; i < lim; ++i) refVisPeak = std::max (refVisPeak, std::abs ((*ref)[i]) * refGain);
     }
-    g.setColour (accent2);
-    g.fillPath (p);
-}
+    const float scale = 1.0f / std::max (0.25f, std::max (peak, refVisPeak));
 
+    if (haveRef)
+    {
+        juce::Path rp;
+        const double perRef = spanSec * refRate / (double) w;
+        for (int x = 0; x < w; ++x)
+        {
+            const size_t a = (size_t) refOnset + (size_t) (x * perRef);
+            const size_t e = std::min (ref->size(), (size_t) refOnset + (size_t) ((x + 1) * perRef) + 1);
+            if (a >= ref->size()) break;
+            float lo = 0, hi = 0;
+            for (size_t i = a; i < e; ++i) { lo = std::min (lo, (*ref)[i] * refGain); hi = std::max (hi, (*ref)[i] * refGain); }
+            const float px = r.getX() + (float) x;
+            rp.addLineSegment (juce::Line<float> (px, r.getCentreY() - hi * scale * r.getHeight() * 0.5f,
+                                                  px, r.getCentreY() - lo * scale * r.getHeight() * 0.5f - 0.5f), 0.5f);
+        }
+        g.setColour (accent.withAlpha (0.45f));
+        g.fillPath (rp);
+        g.setColour (accent.withAlpha (0.8f));
+        g.drawText ("REF", getLocalBounds().removeFromTop (18).reduced (8, 0), juce::Justification::centredRight);
+    }
+
+    if (! k.empty())
+    {
+        juce::Path p;
+        const double per = (double) k.size() / w;
+        for (int x = 0; x < w; ++x)
+        {
+            const size_t a = (size_t) (x * per), e = std::min (k.size(), (size_t) ((x + 1) * per) + 1);
+            float lo = 0, hi = 0;
+            for (size_t i = a; i < e; ++i) { lo = std::min (lo, k[i]); hi = std::max (hi, k[i]); }
+            const float px = r.getX() + (float) x;
+            p.addLineSegment (juce::Line<float> (px, r.getCentreY() - hi * scale * r.getHeight() * 0.5f,
+                                                 px, r.getCentreY() - lo * scale * r.getHeight() * 0.5f - 0.5f), 0.5f);
+        }
+        g.setColour (accent2);
+        g.fillPath (p);
+    }
+}
 void SpectrumView::paint (juce::Graphics& g)
 {
     using namespace col;

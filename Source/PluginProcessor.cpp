@@ -28,6 +28,7 @@ void KickforgeProcessor::prepareToPlay (double sr, int block)
     sub.prepare (sr, block);
     click.prepare (sr, block);
     preview.prepare (sr);
+    reference.prepare (sr);
     for (auto& f : fx) f.prepare (sr, block);
     maxChunk = std::max (16, block);
     mixBuf.setSize (6, maxChunk);
@@ -71,6 +72,7 @@ void KickforgeProcessor::handleMidi (const juce::MidiMessage& m, int pos)
     {
         sub.noteOn (m.getNoteNumber(), m.getFloatVelocity());
         click.noteOn (m.getNoteNumber(), m.getFloatVelocity());
+        reference.noteOn (pos + std::max (0, getLatencySamples())); // same latency as the synth output
         if (moEnable != nullptr && moEnable->load() > 0.5f) // G-11
         {
             flushMidiOut (pos + 1);
@@ -243,6 +245,11 @@ void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     scopeFifo.push (buffer.getReadPointer (0), n);
     auto mainOut = getBusBuffer (buffer, false, 0);
+    {   // AI link A/B: the scope above stays synth-only; Reference mode replaces the synth, Both sums.
+        const bool refAudible = reference.isAudible();
+        if (refAudible && reference.getMode() == kf::RefMode::reference) mainOut.clear();
+        reference.process (mainOut, refAudible);
+    }
     preview.process (mainOut);
     midi.clear();
     midi.addEvents (outMidi, 0, n, 0);
@@ -256,7 +263,12 @@ void KickforgeProcessor::getStateInformation (juce::MemoryBlock& dest)
     st.removeChild (st.getChildWithName ("click"), nullptr);
     st.appendChild (click.saveState(), nullptr); // sample paths + click envelopes
     if (auto xml = st.createXml())
+    {   // Reference + Live-link switch live beside the parameter state (never part of presets / apply)
+        auto lx = reference.saveState();
+        lx->setAttribute ("link", live.isEnabled());
+        xml->addChildElement (lx.release());
         copyXmlToBinary (*xml, dest);
+    }
 }
 
 void KickforgeProcessor::setStateInformation (const void* data, int size)
@@ -264,8 +276,19 @@ void KickforgeProcessor::setStateInformation (const void* data, int size)
     if (auto xml = getXmlFromBinary (data, size))
         if (xml->hasTagName (apvts.state.getType()))
         {
+            std::unique_ptr<juce::XmlElement> liveXml;
+            if (auto* l = xml->getChildByName ("kfLive"))
+            {
+                liveXml = std::make_unique<juce::XmlElement> (*l);
+                xml->removeChildElement (l, true);
+            }
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
             click.loadState (apvts.state.getChildWithName ("click"));
             subCurves.loadFromState();
+            if (liveXml != nullptr)
+            {
+                reference.restoreState (*liveXml);
+                live.setEnabled (liveXml->getBoolAttribute ("link", false));
+            }
         }
 }
