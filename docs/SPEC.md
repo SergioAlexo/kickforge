@@ -120,11 +120,11 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [ ] U-15 Audition button / play kick without MIDI (unverified)
 
 ## P - Presets / export
-- [ ] P-01 Preset save/load/browser with categories (540+ presets in KICK 3)
-- [ ] P-02 Global presets (whole kick) plus per-layer / sub-only / sample-selection presets
-- [ ] P-03 Import and export preset files
+- [x] P-01 Preset save/load/browser with categories (540+ presets in KICK 3)
+- [x] P-02 Global presets (whole kick) plus per-layer / sub-only / sample-selection presets
+- [x] P-03 Import and export preset files
 - [ ] P-04 Load KICK 2 presets (compat; out of scope for Kickforge)
-- [ ] P-05 Kick-to-WAV export (render current kick; drag-out to DAW unverified)
+- [x] P-05 Kick-to-WAV export (render current kick; drag-out to DAW unverified)
 - [ ] P-06 Import-and-analyze: load a kick sample, estimate pitch/amp curves and harmonics, create a preset
 - [ ] P-07 AI import recreates sub with the sub generator and places the top end in a sample layer as a trimmed section of the original
 - [ ] P-08 Import accepts a longer loop; user highlights a single hit region to analyze
