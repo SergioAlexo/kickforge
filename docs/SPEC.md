@@ -56,7 +56,7 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [x] C-07 Per-layer volume and routing to FX buses (see F-xx)
 - [x] C-08 Drag-and-drop a sample onto a layer
 - [x] C-09 Built-in click sample library browser (500 clicks in KICK 3; Kickforge ships synthesized clicks instead)
-- [ ] C-10 Swap the top-end sample after AI import without touching the sub (see P-xx)
+- [x] C-10 Swap the top-end sample after AI import without touching the sub (see P-xx)
 
 ## F - FX
 - [x] F-01 FX section with 2 effect buses plus 1 master bus; each bus holds 2 effects
@@ -125,10 +125,10 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [x] P-03 Import and export preset files
 - [ ] P-04 Load KICK 2 presets (compat; out of scope for Kickforge)
 - [x] P-05 Kick-to-WAV export (render current kick; drag-out to DAW unverified)
-- [ ] P-06 Import-and-analyze: load a kick sample, estimate pitch/amp curves and harmonics, create a preset
-- [ ] P-07 AI import recreates sub with the sub generator and places the top end in a sample layer as a trimmed section of the original
-- [ ] P-08 Import accepts a longer loop; user highlights a single hit region to analyze
-- [ ] P-09 Kick isolation from full tracks
+- [x] P-06 Import-and-analyze: load a kick sample, estimate pitch/amp curves and harmonics, create a preset
+- [x] P-07 AI import recreates sub with the sub generator and places the top end in a sample layer as a trimmed section of the original
+- [x] P-08 Import accepts a longer loop; user highlights a single hit region to analyze
+- [ ] P-09 Kick isolation from full tracks (skipped: no source separation; see commit note)
 - [ ] P-10 Randomization (explicitly NOT in KICK 3; optional extra)
 
 ## Our additions / deviations

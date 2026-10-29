@@ -44,7 +44,9 @@ set(KICKFORGE_ENGINE_SOURCES
     Source/presets/FactoryPresets.cpp
     Source/presets/KickRenderer.cpp
     Source/presets/PresetBar.cpp
-    Source/trigger/Trigger.cpp)
+    Source/trigger/Trigger.cpp
+    Source/analysis/KickAnalysis.cpp
+    Source/analysis/KickImport.cpp)
 
 juce_add_plugin(Kickforge
     COMPANY_NAME "Kickforge"
@@ -88,7 +90,8 @@ add_executable(KickforgeTests
     tests/PresetTests.cpp
     tests/EngineTests.cpp
     tests/IoTests.cpp
-    tests/UiTests.cpp)
+    tests/UiTests.cpp
+    tests/AnalysisTests.cpp)
 target_include_directories(KickforgeTests PRIVATE Source)
 target_compile_definitions(KickforgeTests PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)

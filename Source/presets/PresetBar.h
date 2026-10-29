@@ -2,6 +2,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PresetManager.h"
 #include "KickDragSource.h"
+#include "analysis/KickImport.h"
 
 namespace kf
 {
@@ -26,6 +27,7 @@ private:
     void promptName (const juce::String& title, const juce::String& initial, std::function<void (juce::String)>);
     void saveAs (PresetScope);
     void exportWav();
+    void importKick();
 
     KickforgeProcessor& proc;
     PresetManager manager;
@@ -33,6 +35,7 @@ private:
     juce::TextButton nameButton;
     KickDragSource dragSource;
     std::unique_ptr<juce::FileChooser> chooser;
+    std::unique_ptr<KickImporter> importer;
     bool showFavouritesOnly = false;
 };
 }
