@@ -1,4 +1,4 @@
-# Kickforge feature-parity spec (target: Sonic Academy KICK 3 functionality)
+﻿# Kickforge feature-parity spec (target: Sonic Academy KICK 3 functionality)
 
 Functionality only. Own name, UI, presets and sounds. No third-party samples, artwork or preset data.
 
@@ -47,15 +47,15 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [ ] S-22 Layer delay/start offset for the sub (developer did not commit to this; optional)
 
 ## C - Click / sample layers
-- [ ] C-01 Layers can hold a sample instead of a sub (WAV at minimum; AIFF unverified)
-- [ ] C-02 Sample start point adjustable
-- [ ] C-03 Click delay (layer start delay), added after the initial KICK 3 build
-- [ ] C-04 Sample pitch (semitone/cents) with optional key tracking (unverified)
-- [ ] C-05 Sample layer amp envelope curve and length/trim
-- [ ] C-06 Sample layer phase flip (180 degrees)
-- [ ] C-07 Per-layer volume and routing to FX buses (see F-xx)
+- [x] C-01 Layers can hold a sample instead of a sub (WAV at minimum; AIFF unverified)
+- [x] C-02 Sample start point adjustable
+- [x] C-03 Click delay (layer start delay), added after the initial KICK 3 build
+- [x] C-04 Sample pitch (semitone/cents) with optional key tracking (unverified)
+- [x] C-05 Sample layer amp envelope curve and length/trim
+- [x] C-06 Sample layer phase flip (180 degrees)
+- [x] C-07 Per-layer volume and routing to FX buses (see F-xx)
 - [ ] C-08 Drag-and-drop a sample onto a layer
-- [ ] C-09 Built-in click sample library browser (500 clicks in KICK 3; Kickforge ships synthesized clicks instead)
+- [x] C-09 Built-in click sample library browser (500 clicks in KICK 3; Kickforge ships synthesized clicks instead)
 - [ ] C-10 Swap the top-end sample after AI import without touching the sub (see P-xx)
 
 ## F - FX
