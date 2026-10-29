@@ -7,6 +7,7 @@ KickforgeProcessor::KickforgeProcessor()
       apvts (*this, nullptr, "STATE", kf::createLayout())
 {
     gainParam = apvts.getRawParameterValue ("glob_gain");
+    click.bindParams (apvts);
 }
 
 void KickforgeProcessor::prepareToPlay (double sr, int block)
@@ -73,7 +74,10 @@ juce::AudioProcessorEditor* KickforgeProcessor::createEditor() { return new Kick
 
 void KickforgeProcessor::getStateInformation (juce::MemoryBlock& dest)
 {
-    if (auto xml = apvts.copyState().createXml())
+    auto st = apvts.copyState();
+    st.removeChild (st.getChildWithName ("click"), nullptr);
+    st.appendChild (click.saveState(), nullptr); // sample paths + click envelopes
+    if (auto xml = st.createXml())
         copyXmlToBinary (*xml, dest);
 }
 
@@ -81,5 +85,8 @@ void KickforgeProcessor::setStateInformation (const void* data, int size)
 {
     if (auto xml = getXmlFromBinary (data, size))
         if (xml->hasTagName (apvts.state.getType()))
+        {
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+            click.loadState (apvts.state.getChildWithName ("click"));
+        }
 }

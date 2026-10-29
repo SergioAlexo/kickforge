@@ -30,6 +30,7 @@ set(KICKFORGE_ENGINE_SOURCES
     Source/synth/SubVoice.cpp
     Source/click/ClickParams.cpp
     Source/click/ClickLayer.cpp
+    Source/click/ClickGen.cpp
     Source/fx/FxParams.cpp
     Source/fx/FxChain.cpp)
 
@@ -68,7 +69,8 @@ add_executable(KickforgeTests
     ${KICKFORGE_ENGINE_SOURCES}
     tests/CurveTests.cpp
     tests/TuningTests.cpp
-    tests/RenderTests.cpp)
+    tests/RenderTests.cpp
+    tests/ClickTests.cpp)
 target_include_directories(KickforgeTests PRIVATE Source)
 target_compile_definitions(KickforgeTests PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)
