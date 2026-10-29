@@ -183,6 +183,7 @@ void ClickLayer::setEnvelope (int layer, const Curve& c)
 {
     if (layer < 0 || layer >= kNumClickLayers) return;
     { const juce::ScopedLock sl (stateLock); slots[(size_t) layer].curve = c; }
+    ++stateVer;
     publish (layer);
 }
 
@@ -287,6 +288,7 @@ void ClickLayer::loadSample (int layer, const juce::File& file)
     if (layer < 0 || layer >= kNumClickLayers) return;
     auto& s = slots[(size_t) layer];
     const int gen = ++s.generation;
+    ++stateVer;
     {
         const juce::ScopedLock sl (stateLock);
         s.path = file.getFullPathName();
@@ -309,6 +311,7 @@ void ClickLayer::loadSampleFromMemory (int layer, std::vector<float> mono, doubl
     if (layer < 0 || layer >= kNumClickLayers) return;
     auto& s = slots[(size_t) layer];
     const int gen = ++s.generation;
+    ++stateVer;
     {
         const juce::ScopedLock sl (stateLock);
         s.path = label;
@@ -323,6 +326,7 @@ void ClickLayer::clearSample (int layer)
     if (layer < 0 || layer >= kNumClickLayers) return;
     auto& s = slots[(size_t) layer];
     ++s.generation;
+    ++stateVer;
     {
         const juce::ScopedLock sl (stateLock);
         s.path.clear();

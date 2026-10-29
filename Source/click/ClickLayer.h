@@ -60,6 +60,9 @@ public:
     /** Which FX bus a layer routes to (C-07; the FX module reads this). */
     int getLayerBus (int layer) const noexcept;
 
+    /** Bumped on every envelope edit / sample load / clear (live-link change detection). */
+    int getStateVersion() const noexcept { return stateVer.load(); }
+
     /** Sample paths + envelope curves. Put under the plugin state tree. */
     juce::ValueTree saveState() const;
     void loadState (const juce::ValueTree&);
@@ -130,6 +133,7 @@ private:
     juce::AudioFormatManager formats;
     std::atomic<double> sampleRate { 44100.0 };
     std::atomic<int> pendingJobs { 0 };
+    std::atomic<int> stateVer { 0 };
     int currentNote = 36;
     juce::ThreadPool pool { 1 };
 };

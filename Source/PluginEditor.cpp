@@ -26,7 +26,7 @@ void KickforgeEditor::Content::paint (juce::Graphics& g)
 }
 
 KickforgeEditor::KickforgeEditor (KickforgeProcessor& p)
-    : AudioProcessorEditor (&p), proc (p), presetBar (p),
+    : AudioProcessorEditor (&p), proc (p), presetBar (p), liveToggle (p), refStrip (p),
       curveEditor(), waveform (analyser), spectrum (analyser),
       subPanel (p.apvts), harmPanel (p.apvts), clickPanel (p.apvts, p.getClickLayer(), [this] (int l) { selectCurve (5 + l); }),
       fxPanel (p.apvts), eqPanel (p.apvts, analyser), dynPanel (p.apvts), globalPanel (p.apvts)
@@ -39,6 +39,10 @@ KickforgeEditor::KickforgeEditor (KickforgeProcessor& p)
     fundamental.setJustificationType (juce::Justification::centredRight);
     fundamental.setFont (juce::Font (juce::FontOptions (15.0f, juce::Font::bold)));
     fundamental.setColour (juce::Label::textColourId, col::accent2);
+
+    content.addAndMakeVisible (liveToggle);
+    content.addAndMakeVisible (refStrip);
+    waveform.setReference (&p.getReference());
 
     content.addAndMakeVisible (audition);
     audition.setButtonText ("AUDITION");
@@ -100,9 +104,10 @@ void KickforgeEditor::resized()
     content.setTransform (juce::AffineTransform::scale (s));
     content.setBounds (0, 0, designW, designH);
 
-    presetBar.setBounds (190, 10, 520, 32);
-    fundamental.setBounds (716, 10, 250, 32);
-    audition.setBounds (976, 10, 130, 32);
+    presetBar.setBounds (190, 10, 470, 32);
+    fundamental.setBounds (664, 10, 200, 32);
+    liveToggle.setBounds (870, 10, 130, 32);
+    audition.setBounds (1006, 10, 100, 32);
 
     for (size_t i = 0; i < curveButtons.size(); ++i)
         curveButtons[i].setBounds (8 + (int) i * 82, 58, 78, 24);
@@ -112,6 +117,7 @@ void KickforgeEditor::resized()
 
     for (size_t i = 0; i < tabButtons.size(); ++i)
         tabButtons[i].setBounds (8 + (int) i * 112, 372, 108, 26);
+    refStrip.setBounds (8, 738, 1104, 38);
     const juce::Rectangle<int> r (8, 402, 1104, 330);
     for (auto* c : std::initializer_list<juce::Component*> { &subPanel, &harmPanel, &clickPanel, &fxPanel, &eqPanel, &dynPanel, &globalPanel })
         c->setBounds (r);
@@ -236,6 +242,11 @@ void KickforgeEditor::timerCallback()
         waveform.repaint();
     }
     spectrum.repaint();
+    if (++liveTick % 8 == 0)   // ~4 Hz: link status dot / tooltip, reference overlay
+    {
+        liveToggle.refresh();
+        waveform.repaint();
+    }
     if (eqPanel.isShowing()) eqPanel.repaint();
 
     const auto t = fundamentalText();

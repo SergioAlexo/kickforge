@@ -5,6 +5,7 @@
 #include "ui/Analyser.h"
 #include "ui/CurveEditor.h"
 #include "ui/KfLookAndFeel.h"
+#include "ui/LivePanel.h"
 #include "ui/Panels.h"
 #include "ui/Views.h"
 
@@ -13,7 +14,7 @@
 class KickforgeEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
-    static constexpr int designW = 1120, designH = 740;
+    static constexpr int designW = 1120, designH = 784;
 
     explicit KickforgeEditor (KickforgeProcessor&);
     ~KickforgeEditor() override;
@@ -25,6 +26,10 @@ public:
     void selectTab (int index);
     int getCurveIndex() const noexcept { return curveIndex; }
     kf::ui::CurveEditor& getCurveEditor() noexcept { return curveEditor; }
+    kf::ui::LiveToggle& getLiveToggle() noexcept { return liveToggle; }
+    kf::ui::ReferenceStrip& getRefStrip() noexcept { return refStrip; }
+    /** Runs one timer tick (tests: drains the scope FIFO and refreshes the views). */
+    void pumpForTest() { timerCallback(); }
 
 private:
     struct Content : juce::Component
@@ -50,6 +55,9 @@ private:
     kf::PresetBar presetBar;   // header preset area (Source/presets)
     juce::Label fundamental;
     HoldButton audition;
+    kf::ui::LiveToggle liveToggle;       // AI link switch + status dot
+    kf::ui::ReferenceStrip refStrip;     // AI link reference
+    juce::TooltipWindow tooltips { this, 600 };
 
     std::array<juce::TextButton, 9> curveButtons;
     kf::ui::CurveEditor curveEditor;
@@ -69,4 +77,5 @@ private:
     bool lastHzMode = false;
     int lastKickVersion = -1;
     double lastRate = 0.0;
+    int liveTick = 0;
 };

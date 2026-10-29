@@ -23,6 +23,13 @@ public:
                   std::function<void()> onCancel, PreviewPlayer* preview = nullptr);
     ~ImportDialog() override;
 
+    /** Relabels the confirm button (e.g. "Use region" when the dialog only picks a region). */
+    void setActionLabel (const juce::String& text, const juce::String& tooltip = {})
+    {
+        importBtn.setButtonText (text);
+        if (tooltip.isNotEmpty()) importBtn.setTooltip (tooltip);
+    }
+
     /** Owner shows analysis progress after Import was pressed (disables the buttons). */
     void setBusy (bool busy, const juce::String& message = {});
 

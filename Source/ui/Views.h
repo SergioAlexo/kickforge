@@ -1,6 +1,7 @@
 #pragma once
 #include "Analyser.h"
 #include "KfLookAndFeel.h"
+#include "live/Reference.h"
 
 namespace kf::ui
 {
@@ -10,8 +11,14 @@ class WaveformView : public juce::Component
 public:
     explicit WaveformView (Analyser& a) : analyser (a) {}
     void paint (juce::Graphics&) override;
+    /** AI link: overlay the loaded reference (dimmed), aligned with the kick at its onset. */
+    void setReference (Reference* r) noexcept { reference = r; }
 private:
     Analyser& analyser;
+    Reference* reference = nullptr;
+    std::shared_ptr<const std::vector<float>> refCache; // onset/peak of the displayed reference, cached per clip
+    int refOnset = 0;
+    float refPeak = 0.0f;
 };
 
 /** U-10 / F-21: live spectrum analyser, optionally with the master-EQ response overlaid. */

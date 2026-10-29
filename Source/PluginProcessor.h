@@ -7,6 +7,8 @@
 #include <array>
 #include "ui/AudioFifo.h"
 #include "core/PreviewPlayer.h"
+#include "live/Reference.h"
+#include "live/LiveLink.h"
 
 class KickforgeProcessor : public juce::AudioProcessor
 {
@@ -51,6 +53,9 @@ public:
     juce::MidiKeyboardState keyboardState;
     /** Import-dialog audition: mixed into the main output after the FX chain. */
     kf::PreviewPlayer preview;
+    /** AI link: the loaded reference kick (A/B against the synth) and the live-folder link. */
+    kf::Reference& getReference() noexcept { return reference; }
+    kf::LiveLink& getLiveLink() noexcept { return live; }
 
 private:
     void handleMidi (const juce::MidiMessage&, int pos);
@@ -85,4 +90,7 @@ private:
     std::atomic<float> *moEnable = nullptr, *moFollow = nullptr, *moNote = nullptr, *moChan = nullptr, *moLen = nullptr;
     bool moPending = false;
     int moPendNote = 0, moPendChan = 1, moPendIn = 0; // moPendIn: samples from the start of the current block
+
+    kf::Reference reference;
+    kf::LiveLink live { *this, reference }; // last: it listens to apvts and uses the members above
 };
