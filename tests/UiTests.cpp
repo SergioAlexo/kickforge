@@ -230,3 +230,29 @@ TEST_CASE ("Default sub curves are smooth: no near-vertical drops")
         REQUIRE (std::abs (a.eval (t) - a.eval (t + 0.02)) < 0.15);
     REQUIRE (a.eval (0.05) == 1.0);
 }
+
+TEST_CASE ("Curve editor axis labels stay inside the component at all widths and zooms")
+{
+    juce::ScopedJuceInitialiser_GUI gui;
+    CurveEditor ce;
+    CurveEditor::Source s;
+    s.name = "T";
+    s.get = [] { return Curve ({ { 0.0, 0.0, 0.0 }, { 1.0, 31.0, 0.0 } }); };
+    s.set = [] (const Curve&) {};
+    s.lengthMs = [] { return 500.0; };
+    s.vmin = -12; s.vmax = 48;
+    ce.setSource (s);
+    for (int w : { 300, 500, 736, 1200 })
+        for (auto zoom : { std::pair<double, double> { 0.0, 1.0 }, { 0.0, 0.3 }, { 0.6, 1.0 }, { 0.9, 1.0 }, { 0.2, 0.25 } })
+        {
+            ce.setBounds (0, 0, w, 280);
+            ce.view.t0 = zoom.first; ce.view.t1 = zoom.second;
+            const auto bounds = ce.getLocalBounds();
+            auto labels = ce.timeLabels();
+            REQUIRE (! labels.empty());
+            for (auto& l : labels) REQUIRE (bounds.contains (l.rect));
+            for (auto& l : ce.valueLabels()) REQUIRE (bounds.contains (l.rect));
+            if (zoom.second == 1.0 && zoom.first == 0.0)
+                REQUIRE (labels.back().text == "500 ms");
+        }
+}

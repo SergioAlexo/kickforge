@@ -49,6 +49,11 @@ public:
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     bool keyPressed (const juce::KeyPress&) override;
 
+    struct AxisLabel { juce::Rectangle<int> rect; juce::String text; double pos = 0.0; };
+    /** Axis label layout (also used by paint). Every rect lies inside getLocalBounds(); overlapping labels are dropped. */
+    std::vector<AxisLabel> timeLabels() const;
+    std::vector<AxisLabel> valueLabels() const;
+
     // exposed for tests
     CurveView view;
     void addPointAt (float px, float py);
