@@ -107,7 +107,7 @@ void PresetBar::showSearch()
 void PresetBar::importKick()
 {
     if (importer == nullptr) importer = std::make_unique<KickImporter> (proc);
-    if (importer->isBusy()) return;
+    if (importer->isBusy() || importDialog != nullptr) return;
     chooser = std::make_unique<juce::FileChooser> (
         "Import a kick sample or loop (strongest hit is analysed)",
         juce::File::getSpecialLocation (juce::File::userMusicDirectory), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
@@ -116,15 +116,48 @@ void PresetBar::importKick()
                           [self] (const juce::FileChooser& fc) {
         const auto f = fc.getResult();
         if (self == nullptr || ! f.existsAsFile()) return;
-        self->importer->start (f, ImportOptions {}, [self] (const ImportSummary& s) {
-            if (self == nullptr) return;
-            juce::AlertWindow::showMessageBoxAsync (s.ok ? juce::MessageBoxIconType::InfoIcon
-                                                         : juce::MessageBoxIconType::WarningIcon,
-                                                    "Import kick", s.message);
-        });
+        if (self->openImportDialog (f) == nullptr) // no editor to host the panel: import the strongest hit directly
+            self->importer->start (f, ImportOptions {}, [self] (const ImportSummary& s) {
+                if (self == nullptr) return;
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, "Import kick", s.message);
+            });
     });
 }
 
+ui::ImportDialog* PresetBar::openImportDialog (const juce::File& f)
+{
+    if (importer == nullptr) importer = std::make_unique<KickImporter> (proc);
+    auto* top = getTopLevelComponent();
+    if (top == nullptr || top == this) return nullptr;
+    juce::Component::SafePointer<PresetBar> self (this);
+    importDialog.reset();
+    importDialog = std::make_unique<ui::ImportDialog> (
+        f,
+        [self, f] (const ImportOptions& opts)
+        {
+            if (self == nullptr || self->importer->isBusy()) return;
+            self->importDialog->setBusy (true, "Analysing region ...");
+            self->importer->start (f, opts, [self] (const ImportSummary& s)
+            {
+                if (self == nullptr) return;
+                self->importDialog.reset();
+                juce::AlertWindow::showMessageBoxAsync (s.ok ? juce::MessageBoxIconType::InfoIcon
+                                                             : juce::MessageBoxIconType::WarningIcon,
+                                                        "Import kick", s.message);
+            });
+        },
+        [self]
+        {
+            juce::MessageManager::callAsync ([self] { if (self != nullptr) self->importDialog.reset(); });
+        });
+    top->addAndMakeVisible (*importDialog);
+    const int w = std::min (ui::ImportDialog::preferredW, top->getWidth() - 20);
+    const int h = std::min (ui::ImportDialog::preferredH, top->getHeight() - 20);
+    importDialog->setBounds (top->getLocalBounds().withSizeKeepingCentre (std::max (200, w), std::max (150, h)));
+    importDialog->toFront (true);
+    importDialog->grabKeyboardFocus();
+    return importDialog.get();
+}
 void PresetBar::exportWav()
 {
     chooser = std::make_unique<juce::FileChooser> (

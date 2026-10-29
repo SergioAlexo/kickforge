@@ -3,6 +3,7 @@
 #include "PresetManager.h"
 #include "KickDragSource.h"
 #include "analysis/KickImport.h"
+#include "ui/ImportDialog.h"
 
 namespace kf
 {
@@ -17,6 +18,9 @@ public:
     PresetManager& getManager() noexcept { return manager; }
     void resized() override;
     void paint (juce::Graphics&) override;
+
+    /** Opens the import region panel for ile on the editor (top-level component). Returns it, or nullptr. */
+    ui::ImportDialog* openImportDialog (const juce::File& file);
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override { updateName(); }
@@ -36,6 +40,7 @@ private:
     KickDragSource dragSource;
     std::unique_ptr<juce::FileChooser> chooser;
     std::unique_ptr<KickImporter> importer;
+    std::unique_ptr<ui::ImportDialog> importDialog;
     bool showFavouritesOnly = false;
 };
 }

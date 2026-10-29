@@ -40,6 +40,7 @@ set(KICKFORGE_ENGINE_SOURCES
     Source/ui/CurveEditor.cpp
     Source/ui/Views.cpp
     Source/ui/Panels.cpp
+    Source/ui/ImportDialog.cpp
     Source/presets/PresetManager.cpp
     Source/presets/FactoryPresets.cpp
     Source/presets/KickRenderer.cpp
