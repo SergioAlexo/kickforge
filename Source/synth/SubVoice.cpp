@@ -28,6 +28,7 @@ void SubVoice::prepare (double sampleRate, int maxBlockSize)
     sr = sampleRate;
     maxBlock = std::max (1, maxBlockSize);
     stScratch.assign ((size_t) maxBlock, 0.0);
+    ntScratch.assign ((size_t) maxBlock, 0.0);
     tmp.assign ((size_t) maxBlock, 0.0f);
     smoothCoef = 1.0 - std::exp (-1.0 / (0.005 * sr)); // 5 ms
     declickSamples = std::max (8.0, 0.0015 * sr);       // 1.5 ms
@@ -41,8 +42,18 @@ void SubVoice::bind (juce::AudioProcessorValueTreeState& apvts, SubCurves& curve
 {
     subPtrs.bind (apvts);
     globPtrs.bind (apvts);
-    pitchSlot = &curves.slot (SubCurveId::Pitch);
-    ampSlot = &curves.slot (SubCurveId::Amp);
+    for (int i = 0; i < kNumCurves; ++i)
+        slotPtr[(size_t) i] = &curves.slot ((SubCurveId) i);
+}
+
+int SubVoice::getBus() const noexcept
+{
+    return subPtrs.bound ? juce::jlimit (0, 2, (int) (subPtrs.bus->load() + 0.5f)) : sub.bus;
+}
+
+float SubVoice::getPan() const noexcept
+{
+    return subPtrs.bound ? subPtrs.pan->load() : sub.pan;
 }
 
 void SubVoice::refresh() noexcept
@@ -62,11 +73,12 @@ void SubVoice::setPitchBend (float b) { bend = juce::jlimit (-1.0f, 1.0f, b); }
 
 void SubVoice::stopLayer (Layer& l) noexcept
 {
-    if (l.pitchSnap != nullptr) CurveSlot::release (l.pitchSnap);
-    if (l.ampSnap != nullptr) CurveSlot::release (l.ampSnap);
-    l.pitchSnap = l.ampSnap = nullptr;
-    l.pitchW.reset();
-    l.ampW.reset();
+    for (size_t i = 0; i < (size_t) kNumCurves; ++i)
+    {
+        if (l.snap[i] != nullptr) CurveSlot::release (l.snap[i]);
+        l.snap[i] = nullptr;
+        l.walker[i].reset();
+    }
     l.active = false;
     l.releasing = false;
 }
@@ -74,13 +86,28 @@ void SubVoice::stopLayer (Layer& l) noexcept
 void SubVoice::startLayer (Layer& l, int note, float vel) noexcept
 {
     stopLayer (l);
-    if (pitchSlot == nullptr || ampSlot == nullptr) return;
-    l.pitchSnap = pitchSlot->acquire();
-    l.ampSnap = ampSlot->acquire();
-    l.pitchW.emplace (l.pitchSnap->curve.walker());
-    l.ampW.emplace (l.ampSnap->curve.walker());
+    if (slotPtr[(size_t) SubCurveId::Pitch] == nullptr || slotPtr[(size_t) SubCurveId::Amp] == nullptr) return;
+    for (size_t i = 0; i < (size_t) kNumCurves; ++i)
+        if (slotPtr[i] != nullptr)
+        {
+            l.snap[i] = slotPtr[i]->acquire();
+            l.walker[i].emplace (l.snap[i]->curve.walker());
+        }
     l.note = note;
-    l.phase = wrap01 ((double) sub.startPhaseDeg / 360.0);
+    const double p0 = wrap01 ((double) sub.startPhaseDeg / 360.0);
+    l.ph.fill (p0);
+    l.corr.fill (0.0);
+    l.corrLeft = 0;
+    l.lockDone = false;
+    l.delayLeft = (double) sub.delayMs * 0.001 * sr;
+    for (size_t k = 0; k < (size_t) SubSettings::kNumHarmonics; ++k)
+    {
+        const auto& h = sub.harm[k];
+        l.hGain[k] = h.gainDb <= -59.9f ? 0.0f : juce::Decibels::decibelsToGain (h.gainDb);
+        l.hDec[k] = 1.0f;
+        l.hDecayCoef[k] = h.decayMs >= 4999.0f ? 1.0f
+                          : (float) std::exp (-6.907755278982137 / std::max (1.0, (double) h.decayMs * 0.001 * sr));
+    }
     l.time = 0.0;
     l.length = std::max (0.005, (double) sub.lengthMs * 0.001);
     const float s = juce::jlimit (0.0f, 1.0f, glob.velSens);
@@ -169,28 +196,55 @@ float SubVoice::waveform (double p, double dp) const noexcept
     return 0.0f;
 }
 
-void SubVoice::renderLayer (Layer& l, float* out, int n, const double* stOff) noexcept
+void SubVoice::renderLayer (Layer& l, float* out, int n) noexcept
 {
     const double dt = 1.0 / sr;
     const double a4scale = (double) glob.a4 / 440.0;
     const double maxF = 0.45 * sr;
     const double tailFade = std::min (0.002, l.length * 0.1);
+    constexpr size_t iPitch = (size_t) SubCurveId::Pitch, iAmp = (size_t) SubCurveId::Amp,
+                     iDrive = (size_t) SubCurveId::Drive, iHarm = (size_t) SubCurveId::HarmAmount,
+                     iKt = (size_t) SubCurveId::KeyTrack;
+    const bool useKt = sub.keyTrack;
+    const int corrLen = std::max (1, (int) (0.015 * sr)); // S-17 phase-lock correction spread over 15 ms
+    bool anyHarm = false;
+    for (float g : l.hGain) anyHarm = anyHarm || g > 0.0f;
+    const bool anyDrive = sub.drive > 0.0f;
+    std::array<double, SubSettings::kNumHarmonics> hRatio {};
+    for (size_t k = 0; k < hRatio.size(); ++k) hRatio[k] = std::exp2 ((double) sub.harm[k].semis / 12.0);
 
     for (int i = 0; i < n; ++i)
     {
+        if (l.delayLeft > 0.0) { l.delayLeft -= 1.0; continue; } // S-22: nothing happens before the offset
         if (l.time >= l.length) { stopLayer (l); return; }
         const double u = l.time / l.length;
-        const double v = l.pitchW->at (u);
+        const double v = l.walker[iPitch]->at (u);
+        const double ktw = (useKt && l.walker[iKt]) ? std::clamp (l.walker[iKt]->at (u), 0.0, 1.0) : (useKt ? 1.0 : 0.0);
+        const double st = stScratch[(size_t) i] + ntScratch[(size_t) i] * ktw;
         double f;
         if (sub.pitchMode == PitchMode::Semitones)
-            f = 440.0 * a4scale * std::exp2 ((((double) sub.rootNote + stOff[i] + v) - 69.0) / 12.0);
+            f = 440.0 * a4scale * std::exp2 ((((double) sub.rootNote + st + v) - 69.0) / 12.0);
         else
-            f = std::max (0.0, v) * std::exp2 (stOff[i] / 12.0) * a4scale;
+            f = std::max (0.0, v) * std::exp2 (st / 12.0) * a4scale;
         f = std::clamp (f, 0.5, maxF);
         const double dp = f * dt;
         lastFreq = f;
 
-        double amp = std::max (0.0, l.ampW->at (u));
+        // S-17 phase lock: from lockPos on the phase is re-anchored, so edits before it do not move the tail
+        if (sub.phaseLock && ! l.lockDone && u >= (double) sub.lockPos)
+        {
+            l.lockDone = true;
+            const double target = wrap01 ((double) sub.startPhaseDeg / 360.0);
+            for (size_t k = 0; k < l.ph.size(); ++k)
+            {
+                double d = target - l.ph[k];
+                d -= std::floor (d + 0.5);
+                l.corr[k] = d / corrLen;
+            }
+            l.corrLeft = corrLen;
+        }
+
+        double amp = std::max (0.0, l.walker[iAmp]->at (u));
         amp *= std::min (1.0, (l.length - l.time) / tailFade);
 
         l.fade += l.fadeStep;
@@ -203,10 +257,41 @@ void SubVoice::renderLayer (Layer& l, float* out, int n, const double* stOff) no
             if (l.rel < 1.0e-4f) { stopLayer (l); return; }
         }
 
-        out[i] += waveform (l.phase, dp) * (float) amp * l.fade * l.rel * l.velGain;
+        float x = waveform (l.ph[0], dp);
+        if (anyHarm)
+        {
+            const double hAmt = l.walker[iHarm] ? std::clamp (l.walker[iHarm]->at (u), 0.0, 1.0) : 1.0;
+            float hs = 0.0f;
+            for (size_t k = 0; k < hRatio.size(); ++k)
+            {
+                l.hDec[k] *= l.hDecayCoef[k];
+                if (l.hGain[k] <= 0.0f) continue;
+                const double hp = l.ph[k + 1];
+                if (f * hRatio[k] < maxF)
+                    hs += (float) std::sin (twoPi * hp) * l.hGain[k] * l.hDec[k];
+            }
+            x += hs * (float) hAmt;
+        }
+        if (anyDrive) // S-19: normalised tanh waveshaper, k -> 0 is the identity
+        {
+            const double dAmt = sub.drive * (l.walker[iDrive] ? std::clamp (l.walker[iDrive]->at (u), 0.0, 1.0) : 1.0);
+            if (dAmt > 0.0005)
+            {
+                const float k = (float) (dAmt * 14.0) + 0.01f;
+                x = std::tanh (k * x) / std::tanh (k);
+            }
+        }
 
-        l.phase += dp;
-        l.phase -= std::floor (l.phase);
+        out[i] += x * (float) amp * l.fade * l.rel * l.velGain;
+
+        l.ph[0] += dp;
+        for (size_t k = 0; k < hRatio.size(); ++k) l.ph[k + 1] += dp * hRatio[k];
+        if (l.corrLeft > 0)
+        {
+            for (size_t k = 0; k < l.ph.size(); ++k) l.ph[k] += l.corr[k];
+            --l.corrLeft;
+        }
+        for (auto& p : l.ph) p -= std::floor (p);
         l.time += dt;
     }
 }
@@ -232,14 +317,15 @@ void SubVoice::process (juce::AudioBuffer<float>& buffer, int start, int num)
                 { noteNow = noteTarget; noteStep = 0.0; }
             }
             userSt += (userStTarget - userSt) * smoothCoef;
-            stScratch[(size_t) i] = (sub.keyTrack ? noteNow - (double) sub.rootNote : 0.0) + userSt;
+            stScratch[(size_t) i] = userSt;
+            ntScratch[(size_t) i] = noteNow - (double) sub.rootNote; // weighted by the key-track curve per layer
         }
 
         // render into a scratch via the output (layers add), then apply smoothed gain to just this layer sum
         // To keep "ADD" semantics, render into a temp region first.
         std::fill_n (tmp.begin(), n, 0.0f);
-        if (cur.active) renderLayer (cur, tmp.data(), n, stScratch.data());
-        if (old.active) renderLayer (old, tmp.data(), n, stScratch.data());
+        if (cur.active) renderLayer (cur, tmp.data(), n);
+        if (old.active) renderLayer (old, tmp.data(), n);
 
         for (int i = 0; i < n; ++i)
         {

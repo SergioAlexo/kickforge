@@ -38,7 +38,8 @@ set(KICKFORGE_ENGINE_SOURCES
     Source/presets/PresetManager.cpp
     Source/presets/FactoryPresets.cpp
     Source/presets/KickRenderer.cpp
-    Source/presets/PresetBar.cpp)
+    Source/presets/PresetBar.cpp
+    Source/trigger/Trigger.cpp)
 
 juce_add_plugin(Kickforge
     COMPANY_NAME "Kickforge"
@@ -48,7 +49,7 @@ juce_add_plugin(Kickforge
     FORMATS VST3 Standalone
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
-    NEEDS_MIDI_OUTPUT FALSE
+    NEEDS_MIDI_OUTPUT TRUE
     VST3_CATEGORIES Instrument Synth Drum
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
@@ -79,7 +80,9 @@ add_executable(KickforgeTests
     tests/ClickTests.cpp
     tests/SynthTests.cpp
     tests/FxTests.cpp
-    tests/PresetTests.cpp)
+    tests/PresetTests.cpp
+    tests/EngineTests.cpp
+    tests/IoTests.cpp)
 target_include_directories(KickforgeTests PRIVATE Source)
 target_compile_definitions(KickforgeTests PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)

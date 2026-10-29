@@ -75,36 +75,52 @@ void FxChain::applyEq (const FxSettings& s)
     hs.setHighShelf (sr, s.hsF, s.hsG);
 }
 
-void FxChain::process (juce::AudioBuffer<float>& buffer, int start, int num)
+void FxChain::beginBlock()
 {
-    if (num <= 0) return;
     if (bound)
     {
         for (auto& l : fLinks) *l.second = l.first->load();
         for (auto& l : iLinks) *l.second = (int) std::lround (l.first->load());
         for (auto& l : bLinks) *l.second = l.first->load() >= 0.5f;
     }
-    FxSettings s = cur;
+    blk = cur;
     // F-19 macros: add macro * amount to the targeted slot knob
     for (size_t m = 0; m < 4; ++m)
     {
-        const int t = s.macroTarget[m] - 1;
+        const int t = blk.macroTarget[m] - 1;
         if (t < 0 || t >= 16) continue;
-        auto& sl = s.slot[(size_t) (t / 4)];
+        auto& sl = blk.slot[(size_t) (t / 4)];
         float* knob[4] = { &sl.a, &sl.b, &sl.c, &sl.mix };
         float& k = *knob[t % 4];
-        k = std::clamp (k + s.macro[m] * s.macroAmt[m], 0.0f, 1.0f);
+        k = std::clamp (k + blk.macro[m] * blk.macroAmt[m], 0.0f, 1.0f);
     }
+}
 
-    float* x = buffer.getWritePointer (0) + start;
-
-    // buses A then B, each two serial slots
-    for (size_t i = 0; i < 4; ++i)
+void FxChain::processBus (int bus, float* x, int num)
+{
+    if (num <= 0) return;
+    for (size_t i = (size_t) bus * 2; i < (size_t) bus * 2 + 2 && i < 4; ++i)
     {
-        const auto& d = s.slot[i];
-        slots[i].setParams (d.type, d.a, d.b, d.c, d.mix, d.bypass, s.quality);
+        const auto& d = blk.slot[i];
+        slots[i].setParams (d.type, d.a, d.b, d.c, d.mix, d.bypass, blk.quality);
         slots[i].process (x, num);
     }
+}
+
+void FxChain::process (juce::AudioBuffer<float>& buffer, int start, int num)
+{
+    if (num <= 0) return;
+    beginBlock();
+    float* x = buffer.getWritePointer (0) + start;
+    processBus (0, x, num);
+    processBus (1, x, num);
+    processMaster (x, num);
+}
+
+void FxChain::processMaster (float* x, int num)
+{
+    if (num <= 0) return;
+    const FxSettings& s = blk;
 
     // master EQ
     if (! s.eqBypass)
