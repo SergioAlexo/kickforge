@@ -104,6 +104,27 @@ void PresetBar::showSearch()
     });
 }
 
+void PresetBar::importKick()
+{
+    if (importer == nullptr) importer = std::make_unique<KickImporter> (proc);
+    if (importer->isBusy()) return;
+    chooser = std::make_unique<juce::FileChooser> (
+        "Import a kick sample or loop (strongest hit is analysed)",
+        juce::File::getSpecialLocation (juce::File::userMusicDirectory), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
+    juce::Component::SafePointer<PresetBar> self (this);
+    chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                          [self] (const juce::FileChooser& fc) {
+        const auto f = fc.getResult();
+        if (self == nullptr || ! f.existsAsFile()) return;
+        self->importer->start (f, ImportOptions {}, [self] (const ImportSummary& s) {
+            if (self == nullptr) return;
+            juce::AlertWindow::showMessageBoxAsync (s.ok ? juce::MessageBoxIconType::InfoIcon
+                                                         : juce::MessageBoxIconType::WarningIcon,
+                                                    "Import kick", s.message);
+        });
+    });
+}
+
 void PresetBar::exportWav()
 {
     chooser = std::make_unique<juce::FileChooser> (
@@ -165,6 +186,7 @@ void PresetBar::showMenu()
     m.addItem (12, "Import preset file...");
     m.addItem (13, "Export preset file...", cur >= 0);
     m.addItem (14, "Export kick as WAV...");
+    m.addItem (17, "Import kick...");
     m.addItem (15, "Open user preset folder");
     m.addItem (16, "Rescan presets");
 
@@ -216,6 +238,7 @@ void PresetBar::showMenu()
                         self->manager.exportFile (cur, fc.getResult().withFileExtension (".kfpreset"));
                 });
                 break;
+            case 17: self->importKick(); break;
             case 14: self->exportWav(); break;
             case 15: pm.getUserDir().createDirectory(); pm.getUserDir().revealToUser(); break;
             case 16: pm.rescan(); break;
