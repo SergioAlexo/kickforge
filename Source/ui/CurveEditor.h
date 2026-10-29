@@ -20,6 +20,7 @@ public:
         std::function<void()> resetToDefault;
         std::function<void (double t)> onLockHere;   // optional: "Phase lock here" (pitch curve)
         double vmin = 0.0, vmax = 1.0;               // default visible value range
+        bool fitToCurve = false;                     // Fit / select / external load frames the curve's own value range (zoom out stays possible)
         double hardMin = -1e9, hardMax = 1e9;        // node value limits
         std::function<double()> lengthMs;            // optional: time axis in ms
         std::function<double (double)> snapValue;    // optional: note snap (pitch curves)
@@ -48,6 +49,11 @@ public:
     void mouseDoubleClick (const juce::MouseEvent&) override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
     bool keyPressed (const juce::KeyPress&) override;
+
+    struct AxisLabel { juce::Rectangle<int> rect; juce::String text; double pos = 0.0; };
+    /** Axis label layout (also used by paint). Every rect lies inside getLocalBounds(); overlapping labels are dropped. */
+    std::vector<AxisLabel> timeLabels() const;
+    std::vector<AxisLabel> valueLabels() const;
 
     // exposed for tests
     CurveView view;

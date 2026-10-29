@@ -39,8 +39,23 @@ void CurveEditor::fitView()
     view.t0 = 0.0;
     view.t1 = 1.0;
     double lo = src.vmin, hi = src.vmax;
-    for (auto& p : curve.getPoints()) { lo = std::min (lo, p.value); hi = std::max (hi, p.value); }
-    const double pad = (hi - lo) * 0.06;
+    if (src.fitToCurve && ! curve.empty())
+    {
+        double clo = 1e300, chi = -1e300;
+        for (auto& p : curve.getPoints()) { clo = std::min (clo, p.value); chi = std::max (chi, p.value); }
+        const double defSpan = std::max (1e-6, src.vmax - src.vmin);
+        if (chi - clo < defSpan * 0.05) // (nearly) flat: keep the default framing but include the curve
+        {
+            lo = std::min (lo, clo); hi = std::max (hi, chi);
+        }
+        else
+        {
+            lo = clo; hi = chi;
+        }
+    }
+    else
+        for (auto& p : curve.getPoints()) { lo = std::min (lo, p.value); hi = std::max (hi, p.value); }
+    const double pad = (hi - lo) * (src.fitToCurve ? 0.12 : 0.06);
     view.vBottom = lo - pad;
     view.vTop = hi + pad;
     repaint();
@@ -74,7 +89,7 @@ void CurveEditor::timerCallback()
     redoBtn.setEnabled (! redoStack.empty());
     if (drag != Drag::none || ! src.get) return;
     auto c = src.get();
-    if (! (c == curve)) { curve = std::move (c); selected = -1; repaint(); }
+    if (! (c == curve)) { curve = std::move (c); selected = -1; if (src.fitToCurve) fitView(); repaint(); }
 }
 
 void CurveEditor::commit()
@@ -153,6 +168,47 @@ juce::String CurveEditor::readoutText (double t, double v) const
     return s;
 }
 
+std::vector<CurveEditor::AxisLabel> CurveEditor::timeLabels() const
+{
+    std::vector<AxisLabel> out;
+    constexpr int labelW = 52, labelH = 14;
+    const double step = timeStep();
+    CurveView v = view; // paint may not have run yet: use the plot rect directly
+    v.x = (float) plot.getX(); v.w = (float) plot.getWidth();
+    int lastRight = -1000;
+    for (double t = std::ceil (v.t0 / step) * step; t <= v.t1 + 1e-9; t += step)
+    {
+        const float x = v.timeToX (t);
+        if (x < (float) plot.getX() - 0.5f || x > (float) plot.getRight() + 0.5f) continue;
+        // centred on the grid line, but inset so edge labels never leave the component
+        const int left = juce::jlimit (0, juce::jmax (0, getWidth() - labelW), (int) std::lround (x) - labelW / 2);
+        const juce::Rectangle<int> r (left, plot.getBottom() + 2, juce::jmin (labelW, getWidth()), labelH);
+        if (x >= (float) plot.getRight() - 1.0f) // the end-of-axis label wins over its neighbours
+            while (! out.empty() && r.getX() < out.back().rect.getRight() + 2) out.pop_back();
+        else if (r.getX() < lastRight + 2) continue;
+        lastRight = r.getRight();
+        out.push_back ({ r, timeText (t), t });
+    }
+    return out;
+}
+
+std::vector<CurveEditor::AxisLabel> CurveEditor::valueLabels() const
+{
+    std::vector<AxisLabel> out;
+    const double step = valueStep();
+    CurveView v = view;
+    v.y = (float) plot.getY(); v.h = (float) plot.getHeight();
+    for (double val = std::ceil (v.vBottom / step) * step; val <= v.vTop + 1e-9; val += step)
+    {
+        const float y = v.valueToY (val);
+        if (y < (float) plot.getY() || y > (float) plot.getBottom()) continue;
+        const int top = juce::jlimit (0, juce::jmax (0, getHeight() - 14), (int) y - 7);
+        out.push_back ({ { 0, top, juce::jmax (1, plot.getX() - 4), 14 },
+                         juce::String (val, step < 1.0 ? 2 : (step < 10 ? 1 : 0)), val });
+    }
+    return out;
+}
+
 // ------------------------------------------------------------------ painting
 void CurveEditor::paint (juce::Graphics& g)
 {
@@ -168,7 +224,7 @@ void CurveEditor::paint (juce::Graphics& g)
     // time grid
     {
         const double step = timeStep();
-        float lastLabel = -100.0f, lastX = -100.0f;
+        float lastX = -100.0f;
         for (double t = std::ceil (view.t0 / step) * step; t <= view.t1 + 1e-9; t += step)
         {
             const float x = view.timeToX (t);
@@ -176,13 +232,10 @@ void CurveEditor::paint (juce::Graphics& g)
             lastX = x;
             g.setColour (line.withAlpha (0.55f));
             g.drawVerticalLine ((int) x, pf.getY(), pf.getBottom());
-            if (x > lastLabel + 46.0f)
-            {
-                g.setColour (dim);
-                g.drawText (timeText (t), (int) x - 26, plot.getBottom() + 2, 52, 14, juce::Justification::centred);
-                lastLabel = x;
-            }
         }
+        g.setColour (dim);
+        for (auto& l : timeLabels())
+            g.drawText (l.text, l.rect, juce::Justification::centred);
     }
     // value grid
     {
@@ -193,12 +246,11 @@ void CurveEditor::paint (juce::Graphics& g)
             if (y < pf.getY() || y > pf.getBottom()) continue;
             g.setColour (std::abs (v) < 1e-9 ? line.brighter (0.4f) : line.withAlpha (0.55f));
             g.drawHorizontalLine ((int) y, pf.getX(), pf.getRight());
-            g.setColour (dim);
-            g.drawText (juce::String (v, step < 1.0 ? 2 : (step < 10 ? 1 : 0)), 0, (int) y - 7, plot.getX() - 4, 14,
-                        juce::Justification::centredRight);
         }
+        g.setColour (dim);
+        for (auto& l : valueLabels())
+            g.drawText (l.text, l.rect, juce::Justification::centredRight);
     }
-
     juce::Graphics::ScopedSaveState ss (g);
     g.reduceClipRegion (plot);
 

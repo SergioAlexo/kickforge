@@ -8,6 +8,7 @@
 #include "ui/CurveGeometry.h"
 #include "ui/EqResponse.h"
 #include "ui/FxLabels.h"
+#include "ui/ImportDialog.h"
 #include "ui/Readout.h"
 
 using namespace kf;
@@ -229,4 +230,183 @@ TEST_CASE ("Default sub curves are smooth: no near-vertical drops")
     for (double t = 0.1; t < 0.98; t += 0.01)
         REQUIRE (std::abs (a.eval (t) - a.eval (t + 0.02)) < 0.15);
     REQUIRE (a.eval (0.05) == 1.0);
+}
+
+TEST_CASE ("Curve editor axis labels stay inside the component at all widths and zooms")
+{
+    juce::ScopedJuceInitialiser_GUI gui;
+    CurveEditor ce;
+    CurveEditor::Source s;
+    s.name = "T";
+    s.get = [] { return Curve ({ { 0.0, 0.0, 0.0 }, { 1.0, 31.0, 0.0 } }); };
+    s.set = [] (const Curve&) {};
+    s.lengthMs = [] { return 500.0; };
+    s.vmin = -12; s.vmax = 48;
+    ce.setSource (s);
+    for (int w : { 300, 500, 736, 1200 })
+        for (auto zoom : { std::pair<double, double> { 0.0, 1.0 }, { 0.0, 0.3 }, { 0.6, 1.0 }, { 0.9, 1.0 }, { 0.2, 0.25 } })
+        {
+            ce.setBounds (0, 0, w, 280);
+            ce.view.t0 = zoom.first; ce.view.t1 = zoom.second;
+            const auto bounds = ce.getLocalBounds();
+            auto labels = ce.timeLabels();
+            REQUIRE (! labels.empty());
+            for (auto& l : labels) REQUIRE (bounds.contains (l.rect));
+            for (auto& l : ce.valueLabels()) REQUIRE (bounds.contains (l.rect));
+            if (zoom.second == 1.0 && zoom.first == 0.0)
+                REQUIRE (labels.back().text == "500 ms");
+        }
+}
+
+TEST_CASE ("Harmonic gain knob range: off at the minimum, -12 dB mid, 0 dB to the right")
+{
+    juce::ScopedJuceInitialiser_GUI gui;
+    KickforgeProcessor proc;
+    for (int i = 1; i <= SubSettings::kNumHarmonics; ++i)
+    {
+        auto* p = proc.apvts.getParameter ("sub_h" + juce::String (i) + "_gain");
+        REQUIRE (p != nullptr);
+        REQUIRE_THAT (p->convertTo0to1 (-60.0f), WithinAbs (0.0, 1e-6));
+        REQUIRE_THAT (p->convertFrom0to1 (0.0f), WithinAbs (-60.0, 1e-4));
+        REQUIRE_THAT (p->convertFrom0to1 (0.5f), WithinAbs (-12.0, 0.5));
+        REQUIRE (p->convertTo0to1 (0.0f) > 0.7f);
+        REQUIRE (p->convertTo0to1 (0.0f) < 0.95f);
+        REQUIRE (p->getText (0.0f, 32) == "Off");
+        REQUIRE (p->getText (p->convertTo0to1 (-6.0f), 32).contains ("-6"));
+        REQUIRE_THAT (p->getValueForText ("Off"), WithinAbs (0.0, 1e-6));
+    }
+    // the editor's knob shows Off at the minimum and fills from the left (not bipolar)
+    std::unique_ptr<juce::AudioProcessorEditor> ed (proc.createEditor());
+    std::function<juce::Slider*(juce::Component&)> find = [&] (juce::Component& c) -> juce::Slider* {
+        if (auto* s = dynamic_cast<juce::Slider*> (&c); s != nullptr && s->getName() == "sub_h1_gain") return s;
+        for (auto* ch : c.getChildren()) if (auto* r = find (*ch)) return r;
+        return nullptr;
+    };
+    auto* s = find (*ed);
+    REQUIRE (s != nullptr);
+    REQUIRE (s->getTextFromValue (-60.0) == "Off");
+    REQUIRE ((bool) s->getProperties()["unipolar"]);
+}
+
+TEST_CASE ("Selecting the pitch curve fits the view to its value range")
+{
+    juce::ScopedJuceInitialiser_GUI gui;
+    KickforgeProcessor proc;
+    proc.prepareToPlay (48000.0, 512);
+    std::unique_ptr<juce::AudioProcessorEditor> ed (proc.createEditor());
+    auto* ke = dynamic_cast<KickforgeEditor*> (ed.get());
+    REQUIRE (ke != nullptr);
+    ke->selectCurve (1);
+    ke->selectCurve (0);
+    auto& ce = ke->getCurveEditor();
+    double lo = 1e9, hi = -1e9;
+    for (auto& p : ce.getCurve().getPoints()) { lo = std::min (lo, p.value); hi = std::max (hi, p.value); }
+    REQUIRE (hi - lo > 10.0);
+    REQUIRE (ce.view.vBottom <= lo);
+    REQUIRE (ce.view.vTop >= hi);
+    REQUIRE ((ce.view.vTop - ce.view.vBottom) < (hi - lo) * 1.35); // tight, not the old -12..48
+    // an externally loaded (very different) curve refits on the next timer tick path: Fit does the same
+    proc.getSubCurves().setCurve (SubCurveId::Pitch, Curve ({ { 0.0, 60.0, 0.0 }, { 1.0, 0.0, 0.0 } }));
+    ke->selectCurve (0); // re-select = reload from the processor
+    REQUIRE (ce.view.vTop >= 60.0);
+    // zooming out stays possible: view limits are not clamped
+    ce.view.vBottom -= 100;
+    REQUIRE (ce.view.vBottom < -90);
+}
+
+namespace
+{
+juce::File writeTestKicks (const juce::String& name, std::vector<float> amps)
+{
+    const double sr = 44100.0;
+    const int n = (int) (sr * (0.3 + 0.8 * (double) amps.size()));
+    juce::AudioBuffer<float> b (1, n);
+    b.clear();
+    for (size_t k = 0; k < amps.size(); ++k)
+    {
+        const int s0 = (int) (sr * (0.1 + 0.8 * (double) k));
+        for (int i = 0; i < (int) (sr * 0.5) && s0 + i < n; ++i)
+        {
+            const double t = i / sr;
+            b.setSample (0, s0 + i, amps[k] * (float) (std::sin (2.0 * juce::MathConstants<double>::pi * (45.0 + 60.0 * std::exp (-t * 30.0)) * t) * std::exp (-t * 7.0)));
+        }
+    }
+    auto f = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile (name);
+    f.deleteFile();
+    juce::WavAudioFormat wav;
+    std::unique_ptr<juce::FileOutputStream> os (f.createOutputStream());
+    std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (os.get(), sr, 1, 24, {}, 0));
+    if (w != nullptr) { os.release(); w->writeFromAudioSampleBuffer (b, 0, n); }
+    return f;
+}
+
+bool waitLoaded (ImportDialog& d)
+{
+    return d.waitUntilLoaded (10000);
+}
+}
+
+TEST_CASE ("Import dialog: hits detected off-thread, strongest preselected, region maps to ImportOptions")
+{
+    juce::ScopedJuceInitialiser_GUI gui;
+    const auto file = writeTestKicks ("kf_import_dialog_test.wav", { 0.4f, 0.9f, 0.6f });
+
+    bool imported = false;
+    ImportOptions got;
+    ImportDialog d (file, [&] (const ImportOptions& o) { imported = true; got = o; }, [] {});
+    REQUIRE (! d.isLoaded()); // loading happens on the worker, not in the constructor
+    REQUIRE (waitLoaded (d));
+    REQUIRE (d.getNumHits() == 3);
+    REQUIRE (d.getSelectedHit() == 1);
+    const auto [rs, re] = d.getRegion();
+    REQUIRE (rs >= 0);
+    REQUIRE (re > rs);
+    REQUIRE (d.getOptions().regionStart == rs);
+    REQUIRE (d.getOptions().regionEnd == re);
+
+    d.selectHit (2);
+    REQUIRE (d.getSelectedHit() == 2);
+    REQUIRE (d.getRegion().first > rs);
+
+    d.setCustomRegion (5000, 2000); // reversed drag
+    REQUIRE (d.getSelectedHit() == -1);
+    REQUIRE (d.getOptions().regionStart == 2000);
+    REQUIRE (d.getOptions().regionEnd == 5000);
+
+    auto o = importOptionsForRegion (-50, 99999999, 1000);
+    REQUIRE (o.regionStart == 0);
+    REQUIRE (o.regionEnd == 1000);
+
+    d.setSize (ImportDialog::preferredW, ImportDialog::preferredH);
+    REQUIRE (d.createComponentSnapshot (d.getLocalBounds(), false, 0.5f).isValid());
+    // a click inside a hit selects it
+    const int x = d.sampleToX ((d.getTotalSamples() * 1) / 20);
+    d.mouseDown (juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), { (float) x, (float) d.getWaveArea().getCentreY() }, {}, 0, 0, 0, 0, 0, &d, &d, juce::Time::getCurrentTime(), { (float) x, (float) d.getWaveArea().getCentreY() }, juce::Time::getCurrentTime(), 1, false));
+    d.mouseUp (juce::MouseEvent (juce::Desktop::getInstance().getMainMouseSource(), { (float) x, (float) d.getWaveArea().getCentreY() }, {}, 0, 0, 0, 0, 0, &d, &d, juce::Time::getCurrentTime(), { (float) x, (float) d.getWaveArea().getCentreY() }, juce::Time::getCurrentTime(), 1, false));
+    REQUIRE (d.getSelectedHit() == 0);
+
+    // snapshot for visual checks
+    if (auto dir = juce::SystemStats::getEnvironmentVariable ("KF_UI_SNAPSHOT_DIR", {}); dir.isNotEmpty())
+    {
+        d.selectHit (1);
+        auto img = d.createComponentSnapshot (d.getLocalBounds(), true, 1.0f);
+        juce::File out = juce::File (dir).getChildFile ("ui_import.png");
+        juce::FileOutputStream os (out);
+        if (os.openedOk()) { os.setPosition (0); os.truncate(); juce::PNGImageFormat().writeImageToStream (img, os); }
+        d.setCustomRegion (d.getTotalSamples() / 3, d.getTotalSamples() / 2);
+        auto img2 = d.createComponentSnapshot (d.getLocalBounds(), true, 1.0f);
+        juce::File out2 = juce::File (dir).getChildFile ("ui_import_custom.png");
+        juce::FileOutputStream os2 (out2);
+        if (os2.openedOk()) { os2.setPosition (0); os2.truncate(); juce::PNGImageFormat().writeImageToStream (img2, os2); }
+    }
+    file.deleteFile();
+}
+
+TEST_CASE ("Import dialog: missing file reports an error and keeps Import disabled")
+{
+    juce::ScopedJuceInitialiser_GUI gui;
+    ImportDialog d (juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("kf_nonexistent.wav"), [] (const ImportOptions&) {}, [] {});
+    d.waitUntilLoaded (10000);
+    REQUIRE (! d.isLoaded());
+    REQUIRE (d.getError().isNotEmpty());
 }
