@@ -15,6 +15,14 @@ std::unique_ptr<juce::AudioParameterFloat> mkFloat (const char* id, const char* 
 }
 }
 
+/** -60 dB (= off) at the far left, about -12 dB at the middle of the arc, 0 dB near the right. */
+static Range harmGainRange()
+{
+    Range r (-60.0f, 6.0f, 0.01f);
+    r.setSkewForCentre (-12.0f);
+    return r;
+}
+
 void addSubParams (juce::AudioProcessorValueTreeState::ParameterLayout& layout)
 {
     layout.add (mkFloat ("sub_gain", "Sub Level", Range (-60.0f, 6.0f, 0.01f, 2.5f), 0.0f, "dB"));
@@ -46,8 +54,12 @@ void addSubParams (juce::AudioProcessorValueTreeState::ParameterLayout& layout)
         const SubSettings def;
         layout.add (mkFloat (("sub_h" + n + "_semi").toRawUTF8(), ("Harmonic " + n + " Pitch").toRawUTF8(),
                              Range (-24.0f, 60.0f, 0.01f), def.harm[(size_t) i].semis, "st"));
-        layout.add (mkFloat (("sub_h" + n + "_gain").toRawUTF8(), ("Harmonic " + n + " Gain").toRawUTF8(),
-                             Range (-60.0f, 6.0f, 0.01f, 2.5f), -60.0f, "dB"));
+        layout.add (std::make_unique<juce::AudioParameterFloat> (
+            PID { ("sub_h" + n + "_gain").toRawUTF8(), 1 }, ("Harmonic " + n + " Gain").toRawUTF8(), harmGainRange(), -60.0f,
+            juce::AudioParameterFloatAttributes()
+                .withLabel ("dB")
+                .withStringFromValueFunction ([] (float v, int) { return v <= -59.99f ? juce::String ("Off") : juce::String (v, 1) + " dB"; })
+                .withValueFromStringFunction ([] (const juce::String& t) { return t.trim().startsWithIgnoreCase ("off") ? -60.0f : t.getFloatValue(); })));
         layout.add (mkFloat (("sub_h" + n + "_decay").toRawUTF8(), ("Harmonic " + n + " Decay").toRawUTF8(),
                              Range (5.0f, 5000.0f, 1.0f, 0.4f), 5000.0f, "ms"));
     }

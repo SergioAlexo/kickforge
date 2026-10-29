@@ -43,7 +43,7 @@ void KfLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, in
     g.setColour (line);
     g.strokePath (track, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-    const bool bipolar = s.getMinimum() < 0 && s.getMaximum() > 0;
+    const bool bipolar = s.getMinimum() < 0 && s.getMaximum() > 0 && ! (bool) s.getProperties()["unipolar"];
     const float from = bipolar ? startAngle + (float) s.valueToProportionOfLength (0.0) * (endAngle - startAngle) : startAngle;
     juce::Path val;
     val.addCentredArc (c.x, c.y, arcR, arcR, 0, std::min (from, ang), std::max (from, ang), true);

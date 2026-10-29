@@ -38,7 +38,9 @@ public:
         {
             const juce::String unit = p->getLabel();
             slider.setDoubleClickReturnValue (true, p->convertFrom0to1 (p->getDefaultValue()));
-            slider.textFromValueFunction = [unit] (double v) { return formatKnobValue (v, unit); };
+            const bool offAtMin = unit == "dB" && p->convertFrom0to1 (0.0f) <= -59.99f;
+            if (unit == "dB") slider.getProperties().set ("unipolar", true); // level knobs fill from the minimum, not from 0 dB
+            slider.textFromValueFunction = [unit, offAtMin] (double v) { return offAtMin && v <= -59.99 ? juce::String ("Off") : formatKnobValue (v, unit); };
             slider.valueFromTextFunction = [unit] (const juce::String& t)
             {
                 auto s = t.trim();

@@ -256,3 +256,33 @@ TEST_CASE ("Curve editor axis labels stay inside the component at all widths and
                 REQUIRE (labels.back().text == "500 ms");
         }
 }
+
+TEST_CASE ("Harmonic gain knob range: off at the minimum, -12 dB mid, 0 dB to the right")
+{
+    juce::ScopedJuceInitialiser_GUI gui;
+    KickforgeProcessor proc;
+    for (int i = 1; i <= SubSettings::kNumHarmonics; ++i)
+    {
+        auto* p = proc.apvts.getParameter ("sub_h" + juce::String (i) + "_gain");
+        REQUIRE (p != nullptr);
+        REQUIRE_THAT (p->convertTo0to1 (-60.0f), WithinAbs (0.0, 1e-6));
+        REQUIRE_THAT (p->convertFrom0to1 (0.0f), WithinAbs (-60.0, 1e-4));
+        REQUIRE_THAT (p->convertFrom0to1 (0.5f), WithinAbs (-12.0, 0.5));
+        REQUIRE (p->convertTo0to1 (0.0f) > 0.7f);
+        REQUIRE (p->convertTo0to1 (0.0f) < 0.95f);
+        REQUIRE (p->getText (0.0f, 32) == "Off");
+        REQUIRE (p->getText (p->convertTo0to1 (-6.0f), 32).contains ("-6"));
+        REQUIRE_THAT (p->getValueForText ("Off"), WithinAbs (0.0, 1e-6));
+    }
+    // the editor's knob shows Off at the minimum and fills from the left (not bipolar)
+    std::unique_ptr<juce::AudioProcessorEditor> ed (proc.createEditor());
+    std::function<juce::Slider*(juce::Component&)> find = [&] (juce::Component& c) -> juce::Slider* {
+        if (auto* s = dynamic_cast<juce::Slider*> (&c); s != nullptr && s->getName() == "sub_h1_gain") return s;
+        for (auto* ch : c.getChildren()) if (auto* r = find (*ch)) return r;
+        return nullptr;
+    };
+    auto* s = find (*ed);
+    REQUIRE (s != nullptr);
+    REQUIRE (s->getTextFromValue (-60.0) == "Off");
+    REQUIRE ((bool) s->getProperties()["unipolar"]);
+}
