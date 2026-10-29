@@ -23,13 +23,13 @@ replacement) tab; output limiter; EQ tab with analyser; 4 macros; WAV export; re
 curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KICK 3.
 
 ## S - Sub / body synth
-- [ ] S-01 Up to 5 layers total, each layer is either a synth sub or a sample (click); shared layer slots with C-xx
+- [x] S-01 Up to 5 layers total, each layer is either a synth sub or a sample (click); shared layer slots with C-xx
 - [x] S-02 Sub layer fundamental oscillator, sine-based
 - [x] S-03 Additional oscillator waveform shapes beyond sine (unverified; plan: sine, triangle, saw-ish, square-ish, soft-clipped sine)
-- [ ] S-04 Up to 9 additional harmonics per sub layer, each individually tuned (harmonic ratio / semitone offset)
-- [ ] S-05 Per-harmonic Gain control
-- [ ] S-06 Per-harmonic Decay control
-- [ ] S-07 Harmonics-section amount envelope curve (added in a KICK 3 beta)
+- [x] S-04 Up to 9 additional harmonics per sub layer, each individually tuned (harmonic ratio / semitone offset)
+- [x] S-05 Per-harmonic Gain control
+- [x] S-06 Per-harmonic Decay control
+- [x] S-07 Harmonics-section amount envelope curve (added in a KICK 3 beta)
 - [x] S-08 Pitch envelope per layer, node-based curve editor (see U-xx)
 - [x] S-09 Amp (volume) envelope per layer, node-based curve editor
 - [x] S-10 Pitch curve Bezier segments (curvature per segment)
@@ -37,14 +37,14 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [ ] S-12 Pitch snap: node pitch values snap to musical notes (toggle)
 - [x] S-13 Base tuning of sub in Hz and/or note name with fine tune in cents (unverified ranges; suggested 20-400 Hz, +/-100 cents)
 - [x] S-14 Key tracking on/off per layer
-- [ ] S-15 Selective key tracking: choose which pitch-curve node(s) follow MIDI note, so the tail transposes and the initial thump stays fixed
+- [x] S-15 Selective key tracking: choose which pitch-curve node(s) follow MIDI note, so the tail transposes and the initial thump stays fixed
 - [x] S-16 Per-layer phase offset, 180 degree flip at minimum (full 0-360 rotation, unverified)
-- [ ] S-17 Phase lock: right-click a node locks the phase of the remaining tail so the early part can be edited without realigning the tail
+- [x] S-17 Phase lock: right-click a node locks the phase of the remaining tail so the early part can be edited without realigning the tail
 - [x] S-18 Layer length / overall decay scaling that stretches the envelopes (length control; unverified exact behavior)
-- [ ] S-19 Drive amount per sub layer with its own envelope curve (added in a KICK 3 beta)
+- [x] S-19 Drive amount per sub layer with its own envelope curve (added in a KICK 3 beta)
 - [x] S-20 Gate on the voice (end-of-sound gate / note-off behavior; unverified specifics)
 - [x] S-21 Layer mute/solo and per-layer volume (unverified)
-- [ ] S-22 Layer delay/start offset for the sub (developer did not commit to this; optional)
+- [x] S-22 Layer delay/start offset for the sub (developer did not commit to this; optional)
 
 ## C - Click / sample layers
 - [x] C-01 Layers can hold a sample instead of a sub (WAV at minimum; AIFF unverified)
@@ -60,7 +60,7 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 
 ## F - FX
 - [x] F-01 FX section with 2 effect buses plus 1 master bus; each bus holds 2 effects
-- [ ] F-02 Per-layer assignment of layers to bus A / bus B / master-only
+- [x] F-02 Per-layer assignment of layers to bus A / bus B / master-only
 - [x] F-03 About 15 effects selectable in any slot (swappable)
 - [x] F-04 Distortion: Clipper
 - [x] F-05 Distortion: Tube

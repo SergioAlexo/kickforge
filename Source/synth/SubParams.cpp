@@ -33,6 +33,24 @@ void addSubParams (juce::AudioProcessorValueTreeState::ParameterLayout& layout)
     layout.add (std::make_unique<juce::AudioParameterChoice> (
         PID { "sub_gate", 1 }, "Sub Gate", juce::StringArray { "One-shot", "Gate" }, 0));
     layout.add (mkFloat ("sub_release", "Sub Release", Range (1.0f, 2000.0f, 1.0f, 0.4f), 50.0f, "ms"));
+    layout.add (mkFloat ("sub_drive", "Sub Drive", Range (0.0f, 1.0f, 0.001f), 0.0f));
+    layout.add (std::make_unique<juce::AudioParameterBool> (PID { "sub_lock", 1 }, "Sub Phase Lock", false));
+    layout.add (mkFloat ("sub_lockpos", "Sub Phase Lock Position", Range (0.0f, 1.0f, 0.001f), 0.3f));
+    layout.add (mkFloat ("sub_delay", "Sub Start Offset", Range (0.0f, 200.0f, 0.01f, 0.5f), 0.0f, "ms"));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        PID { "sub_bus", 1 }, "Sub FX Bus", juce::StringArray { "Master", "Bus A", "Bus B" }, 0));
+    layout.add (mkFloat ("sub_pan", "Sub Pan", Range (-1.0f, 1.0f, 0.001f), 0.0f));
+    for (int i = 0; i < SubSettings::kNumHarmonics; ++i)
+    {
+        const auto n = juce::String (i + 1);
+        const SubSettings def;
+        layout.add (mkFloat (("sub_h" + n + "_semi").toRawUTF8(), ("Harmonic " + n + " Pitch").toRawUTF8(),
+                             Range (-24.0f, 60.0f, 0.01f), def.harm[(size_t) i].semis, "st"));
+        layout.add (mkFloat (("sub_h" + n + "_gain").toRawUTF8(), ("Harmonic " + n + " Gain").toRawUTF8(),
+                             Range (-60.0f, 6.0f, 0.01f, 2.5f), -60.0f, "dB"));
+        layout.add (mkFloat (("sub_h" + n + "_decay").toRawUTF8(), ("Harmonic " + n + " Decay").toRawUTF8(),
+                             Range (5.0f, 5000.0f, 1.0f, 0.4f), 5000.0f, "ms"));
+    }
 }
 
 void SubParamPtrs::bind (juce::AudioProcessorValueTreeState& a)
@@ -49,6 +67,19 @@ void SubParamPtrs::bind (juce::AudioProcessorValueTreeState& a)
     length = a.getRawParameterValue ("sub_length");
     gate = a.getRawParameterValue ("sub_gate");
     release = a.getRawParameterValue ("sub_release");
+    drive = a.getRawParameterValue ("sub_drive");
+    lock = a.getRawParameterValue ("sub_lock");
+    lockPos = a.getRawParameterValue ("sub_lockpos");
+    delay = a.getRawParameterValue ("sub_delay");
+    bus = a.getRawParameterValue ("sub_bus");
+    pan = a.getRawParameterValue ("sub_pan");
+    for (int i = 0; i < SubSettings::kNumHarmonics; ++i)
+    {
+        const auto n = juce::String (i + 1);
+        hSemi[(size_t) i] = a.getRawParameterValue ("sub_h" + n + "_semi");
+        hGain[(size_t) i] = a.getRawParameterValue ("sub_h" + n + "_gain");
+        hDecay[(size_t) i] = a.getRawParameterValue ("sub_h" + n + "_decay");
+    }
     bound = true;
 }
 
@@ -67,5 +98,17 @@ void SubParamPtrs::read (SubSettings& s) const noexcept
     s.lengthMs = length->load();
     s.gate = gate->load() > 0.5f ? GateMode::Gate : GateMode::OneShot;
     s.releaseMs = release->load();
+    s.drive = drive->load();
+    s.phaseLock = lock->load() > 0.5f;
+    s.lockPos = lockPos->load();
+    s.delayMs = delay->load();
+    s.bus = juce::jlimit (0, 2, (int) (bus->load() + 0.5f));
+    s.pan = pan->load();
+    for (size_t i = 0; i < (size_t) SubSettings::kNumHarmonics; ++i)
+    {
+        s.harm[i].semis = hSemi[i]->load();
+        s.harm[i].gainDb = hGain[i]->load();
+        s.harm[i].decayMs = hDecay[i]->load();
+    }
 }
 }

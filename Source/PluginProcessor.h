@@ -3,6 +3,7 @@
 #include "synth/SubVoice.h"
 #include "click/ClickLayer.h"
 #include "fx/FxChain.h"
+#include <array>
 
 class KickforgeProcessor : public juce::AudioProcessor
 {
@@ -40,11 +41,18 @@ public:
 
 private:
     void handleMidi (const juce::MidiMessage&);
-    void renderMono (juce::AudioBuffer<float>&, int start, int num);
+    void renderBlock (juce::AudioBuffer<float>&, int start, int num);
+    void renderChunk (juce::AudioBuffer<float>&, int start, int n);
+    void addRouted (int bus, float pan, int n);
 
     kf::SubCurves subCurves { apvts };
     kf::SubVoice sub;
     kf::ClickLayer click;
-    kf::FxChain fx;
+    std::array<kf::FxChain, 2> fx; // one chain per channel (the FX state is mono); bus A/B/master
     std::atomic<float>* gainParam = nullptr;
+
+    // Per-layer routing scratch (preallocated in prepareToPlay): channels 0/1 master L/R, 2/3 bus A, 4/5 bus B.
+    juce::AudioBuffer<float> mixBuf, monoBuf;
+    int maxChunk = 0;
+    juce::SmoothedValue<float> gainSm;
 };

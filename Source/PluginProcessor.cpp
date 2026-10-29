@@ -10,15 +10,20 @@ KickforgeProcessor::KickforgeProcessor()
     click.bindParams (apvts);
     sub.bind (apvts, subCurves);
     subCurves.resetAll();
-    fx.bind (apvts);
+    for (auto& f : fx) f.bind (apvts);
 }
 
 void KickforgeProcessor::prepareToPlay (double sr, int block)
 {
     sub.prepare (sr, block);
     click.prepare (sr, block);
-    fx.prepare (sr, block);
-    setLatencySamples (fx.getLatencySamples());
+    for (auto& f : fx) f.prepare (sr, block);
+    maxChunk = std::max (16, block);
+    mixBuf.setSize (6, maxChunk);
+    monoBuf.setSize (1, maxChunk);
+    gainSm.reset (sr, 0.01);
+    gainSm.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (gainParam != nullptr ? gainParam->load() : 0.0f));
+    setLatencySamples (fx[0].getLatencySamples());
 }
 
 bool KickforgeProcessor::isBusesLayoutSupported (const BusesLayout& l) const
@@ -50,13 +55,75 @@ void KickforgeProcessor::handleMidi (const juce::MidiMessage& m)
     }
 }
 
-// The engine is mono: it renders into channel 0 and the result is copied to the other channels.
-void KickforgeProcessor::renderMono (juce::AudioBuffer<float>& buf, int start, int num)
+// Adds monoBuf[0..n) to the routing mix of `bus` (0 master, 1 A, 2 B) with a constant-power pan
+// (0 dB at centre, +3 dB at the extremes).
+void KickforgeProcessor::addRouted (int bus, float pan, int n)
 {
-    if (num <= 0) return;
-    sub.process (buf, start, num);
-    click.process (buf, start, num);
-    fx.process (buf, start, num);
+    const float a = (juce::jlimit (-1.0f, 1.0f, pan) + 1.0f) * (juce::MathConstants<float>::pi * 0.25f);
+    const float gl = std::cos (a) * juce::MathConstants<float>::sqrt2, gr = std::sin (a) * juce::MathConstants<float>::sqrt2;
+    const float* m = monoBuf.getReadPointer (0);
+    float* l = mixBuf.getWritePointer (bus * 2);
+    float* r = mixBuf.getWritePointer (bus * 2 + 1);
+    for (int i = 0; i < n; ++i) { l[i] += m[i] * gl; r[i] += m[i] * gr; }
+}
+
+// n <= maxChunk. Layers render into a mono scratch, get panned into master / bus A / bus B,
+// the buses run their FX and sum into the master, glob_gain is applied, then the master chain
+// (EQ, comp, output gain, limiter = last stage) runs.
+void KickforgeProcessor::renderChunk (juce::AudioBuffer<float>& buffer, int start, int n)
+{
+    mixBuf.clear (0, n);
+    for (int src = -1; src < kf::kNumClickLayers; ++src)
+    {
+        monoBuf.clear (0, n);
+        if (src < 0) sub.process (monoBuf, 0, n);
+        else click.processLayer (src, monoBuf.getWritePointer (0), n);
+        if (src < 0) addRouted (sub.getBus(), sub.getPan(), n);
+        else addRouted (click.getLayerBus (src), click.getLayerPan (src), n);
+    }
+
+    const float gTarget = juce::Decibels::decibelsToGain (gainParam != nullptr ? gainParam->load() : 0.0f);
+    gainSm.setTargetValue (gTarget);
+    float* g = monoBuf.getWritePointer (0);
+    for (int i = 0; i < n; ++i) g[i] = gainSm.getNextValue();
+
+    for (int ch = 0; ch < 2; ++ch)
+    {
+        auto& f = fx[(size_t) ch];
+        f.beginBlock();
+        float* m = mixBuf.getWritePointer (ch);
+        float* a = mixBuf.getWritePointer (2 + ch);
+        float* b = mixBuf.getWritePointer (4 + ch);
+        f.processBus (0, a, n);
+        f.processBus (1, b, n);
+        for (int i = 0; i < n; ++i) m[i] = (m[i] + a[i] + b[i]) * g[i]; // glob_gain BEFORE the limiter
+        f.processMaster (m, n);
+    }
+
+    const int chans = buffer.getNumChannels();
+    const float* L = mixBuf.getReadPointer (0);
+    const float* R = mixBuf.getReadPointer (1);
+    if (chans >= 2)
+    {
+        buffer.copyFrom (0, start, L, n);
+        buffer.copyFrom (1, start, R, n);
+    }
+    else if (chans == 1)
+    {
+        float* o = buffer.getWritePointer (0) + start;
+        for (int i = 0; i < n; ++i) o[i] = 0.5f * (L[i] + R[i]);
+    }
+}
+
+void KickforgeProcessor::renderBlock (juce::AudioBuffer<float>& buf, int start, int num)
+{
+    while (num > 0)
+    {
+        const int n = std::min (num, maxChunk);
+        renderChunk (buf, start, n);
+        start += n;
+        num -= n;
+    }
 }
 
 void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -70,18 +137,13 @@ void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     for (const auto meta : midi)
     {
         const int at = juce::jlimit (pos, n, meta.samplePosition);
-        renderMono (buffer, pos, at - pos);
+        renderBlock (buffer, pos, at - pos);
         pos = at;
         handleMidi (meta.getMessage());
     }
-    renderMono (buffer, pos, n - pos);
-    if (fx.getLatencySamples() != getLatencySamples()) // limiter lookahead changed
-        setLatencySamples (fx.getLatencySamples());
-
-    const float g = juce::Decibels::decibelsToGain (gainParam != nullptr ? gainParam->load() : 0.0f);
-    buffer.applyGain (0, 0, n, g);
-    for (int ch = 1; ch < buffer.getNumChannels(); ++ch)
-        buffer.copyFrom (ch, 0, buffer, 0, 0, n);
+    renderBlock (buffer, pos, n - pos);
+    if (fx[0].getLatencySamples() != getLatencySamples()) // limiter lookahead changed
+        setLatencySamples (fx[0].getLatencySamples());
     midi.clear();
 }
 

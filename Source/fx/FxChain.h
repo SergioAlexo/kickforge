@@ -37,7 +37,15 @@ class FxChain
 {
 public:
     void prepare (double sampleRate, int maxBlockSize);
+    /** Whole chain in place (legacy / tests): bus A -> bus B -> master. */
     void process (juce::AudioBuffer<float>& buffer, int start, int num);
+
+    /** Split API used by the processor (per-layer routing, F-02). Per block: beginBlock() once,
+        then processBus(0 = A, 1 = B) on the signals routed to each bus, then processMaster()
+        on the sum. Each channel needs its own FxChain instance (state is mono). */
+    void beginBlock();
+    void processBus (int bus, float* x, int num);
+    void processMaster (float* x, int num);
 
     /** Read parameters from the processor's APVTS on every process() call. */
     void bind (juce::AudioProcessorValueTreeState& apvts);
@@ -49,7 +57,7 @@ private:
     template <typename T> void link (juce::AudioProcessorValueTreeState&, const juce::String&, T&);
 
     double sr = 48000.0;
-    FxSettings cur;
+    FxSettings cur, blk;
     bool bound = false;
     std::vector<std::pair<std::atomic<float>*, float*>> fLinks;
     std::vector<std::pair<std::atomic<float>*, int*>> iLinks;

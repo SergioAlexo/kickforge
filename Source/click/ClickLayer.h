@@ -35,6 +35,10 @@ public:
     void noteOn (int note, float velocity);
     void noteOff();
     void process (juce::AudioBuffer<float>& buffer, int start, int num);
+    /** ADDS one layer (already gain/mute/solo applied, NOT panned) into out[0..num). Audio thread. */
+    void processLayer (int layer, float* out, int num);
+    /** Layer pan -1..1 (applied by the processor, constant-power). */
+    float getLayerPan (int layer) const noexcept;
 
     // ---- samples (message thread) ----
     /** Loads WAV/AIFF/FLAC/OGG asynchronously. Status becomes loaded or failed. */

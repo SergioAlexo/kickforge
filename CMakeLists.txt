@@ -74,7 +74,8 @@ add_executable(KickforgeTests
     tests/RenderTests.cpp
     tests/ClickTests.cpp
     tests/SynthTests.cpp
-    tests/FxTests.cpp)
+    tests/FxTests.cpp
+    tests/EngineTests.cpp)
 target_include_directories(KickforgeTests PRIVATE Source)
 target_compile_definitions(KickforgeTests PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)

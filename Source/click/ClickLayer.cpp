@@ -438,16 +438,27 @@ void ClickLayer::process (juce::AudioBuffer<float>& buffer, int start, int num)
 {
     if (num <= 0 || buffer.getNumChannels() < 1) return;
     float* out = buffer.getWritePointer (0) + start;
+    for (int l = 0; l < kNumClickLayers; ++l)
+        processLayer (l, out, num);
+}
+
+float ClickLayer::getLayerPan (int layer) const noexcept
+{
+    return layer >= 0 && layer < kNumClickLayers ? param (layer, CP::pan) : 0.0f;
+}
+
+void ClickLayer::processLayer (int l, float* out, int num)
+{
+    if (num <= 0 || l < 0 || l >= kNumClickLayers) return;
     const double sr = sampleRate.load();
     const float master = juce::Decibels::decibelsToGain (masterPtr->load (std::memory_order_relaxed), -60.0f);
     const long fadeN = std::max<long> (4, (long) (0.002 * sr));
 
     bool anySolo = false;
-    for (int l = 0; l < kNumClickLayers; ++l)
-        if (param (l, CP::solo) > 0.5f && (int) std::lround (param (l, CP::source)) != srcOff)
+    for (int k = 0; k < kNumClickLayers; ++k)
+        if (param (k, CP::solo) > 0.5f && (int) std::lround (param (k, CP::source)) != srcOff)
             anySolo = true;
 
-    for (int l = 0; l < kNumClickLayers; ++l)
     {
         auto& s = slots[(size_t) l];
         auto& v = s.voice;
@@ -458,7 +469,7 @@ void ClickLayer::process (juce::AudioBuffer<float>& buffer, int start, int num)
                 retire (s, s.current);
                 s.current = n;
             }
-        if (! v.active) continue;
+        if (! v.active) return;
 
         const bool audible = param (l, CP::mute) < 0.5f && (! anySolo || param (l, CP::solo) > 0.5f);
         const float sign = param (l, CP::flip) > 0.5f ? -1.0f : 1.0f;

@@ -10,6 +10,7 @@ const char* subCurveName (SubCurveId id) noexcept
         case SubCurveId::Amp:         return "sub_amp";
         case SubCurveId::Drive:       return "sub_drive";
         case SubCurveId::HarmAmount:  return "sub_harm";
+        case SubCurveId::KeyTrack:    return "sub_kt";
         default: break;
     }
     return "";
@@ -45,6 +46,11 @@ Curve defaultHarmAmountCurve()
     return Curve ({ { 0.0, 1.0, -0.5 }, { 0.5, 0.35, 0.0 }, { 1.0, 0.0, 0.0 } });
 }
 
+Curve defaultKeyTrackCurve()
+{
+    return Curve ({ { 0.0, 1.0, 0.0 }, { 1.0, 1.0, 0.0 } });
+}
+
 Curve SubCurves::defaultFor (SubCurveId id)
 {
     switch (id)
@@ -53,6 +59,7 @@ Curve SubCurves::defaultFor (SubCurveId id)
         case SubCurveId::Amp:        return defaultAmpCurve();
         case SubCurveId::Drive:      return defaultDriveCurve();
         case SubCurveId::HarmAmount: return defaultHarmAmountCurve();
+        case SubCurveId::KeyTrack:   return defaultKeyTrackCurve();
         default: break;
     }
     return {};

@@ -9,8 +9,8 @@ namespace kf
     length (sub_length). Values:
       Pitch: semitones relative to the base pitch (pitch mode "Semitones") or Hz (mode "Hz").
       Amp:   linear gain 0..1.
-      Drive / HarmAmount: 0..1 amounts. */
-enum class SubCurveId { Pitch = 0, Amp, Drive, HarmAmount, Count };
+      Drive / HarmAmount / KeyTrack: 0..1 amounts. */
+enum class SubCurveId { Pitch = 0, Amp, Drive, HarmAmount, KeyTrack, Count };
 
 const char* subCurveName (SubCurveId) noexcept;
 
@@ -20,6 +20,8 @@ Curve defaultPitchCurveHz();
 Curve defaultAmpCurve();
 Curve defaultDriveCurve();
 Curve defaultHarmAmountCurve();
+/** Selective key tracking (S-15): per-time weight 0..1 of how much the MIDI note transposes the pitch. */
+Curve defaultKeyTrackCurve();
 
 /** Owns the swappable curve snapshots and mirrors them into the plugin state:
     apvts.state / "CURVES" / "CURVE"(id=...) / "POINT"(t,v,k).

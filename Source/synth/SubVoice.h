@@ -3,6 +3,7 @@
 #include "SubCurves.h"
 #include "SubParams.h"
 #include "core/GlobParams.h"
+#include <array>
 #include <optional>
 #include <vector>
 
@@ -29,7 +30,11 @@ public:
     /** Message thread, before audio starts: reads parameters from the tree and curves from SubCurves. */
     void bind (juce::AudioProcessorValueTreeState&, SubCurves&);
     /** Alternative to bind(): inject curve slots / settings directly (tests). */
-    void setCurveSlots (CurveSlot* pitch, CurveSlot* amp) noexcept { pitchSlot = pitch; ampSlot = amp; }
+    void setCurveSlots (CurveSlot* pitch, CurveSlot* amp, CurveSlot* drive = nullptr,
+                        CurveSlot* harm = nullptr, CurveSlot* keyTrack = nullptr) noexcept
+    {
+        slotPtr = { pitch, amp, drive, harm, keyTrack }; // null drive/harm/keytrack curves count as 1.0
+    }
     void setSettings (const SubSettings& s, const GlobSettings& g) noexcept { sub = s; glob = g; }
 
     void noteOn (int note, float velocity);
@@ -42,8 +47,13 @@ public:
     bool isActive() const noexcept { return cur.active || old.active; }
     /** Instantaneous fundamental (Hz) of the sounding layer at the last rendered sample, 0 if idle. */
     double getLastFrequency() const noexcept { return lastFreq; }
+    /** Routing of the sub layer (0 master, 1 bus A, 2 bus B) and pan -1..1, as of the last block. */
+    int getBus() const noexcept;
+    float getPan() const noexcept;
 
 private:
+    static constexpr int kNumCurves = (int) SubCurveId::Count;
+    static constexpr int kNumOsc = 1 + SubSettings::kNumHarmonics;
     struct Layer
     {
         bool active = false, releasing = false;
@@ -52,14 +62,20 @@ private:
         float velGain = 1.0f;
         float fade = 1.0f, fadeStep = 0.0f; // fade in (+) / out (-)
         float rel = 1.0f, relCoef = 1.0f;
-        const CurveSlot::Snapshot *pitchSnap = nullptr, *ampSnap = nullptr;
-        std::optional<Curve::Walker> pitchW, ampW;
+        std::array<const CurveSlot::Snapshot*, kNumCurves> snap {};
+        std::array<std::optional<Curve::Walker>, kNumCurves> walker;
+        // S-04: oscillator 0 = fundamental, 1..9 = harmonics
+        std::array<double, kNumOsc> ph {}, corr {};   // phases; pending phase-lock corrections (per sample)
+        std::array<float, SubSettings::kNumHarmonics> hGain {}, hDecayCoef {}, hDec {};
+        double delayLeft = 0.0;                        // S-22
+        int corrLeft = 0;
+        bool lockDone = false;
     };
 
     void refresh() noexcept;
     void stopLayer (Layer&) noexcept;
     void startLayer (Layer&, int note, float vel) noexcept;
-    void renderLayer (Layer&, float* out, int n, const double* stOff) noexcept;
+    void renderLayer (Layer&, float* out, int n) noexcept;
     float waveform (double p, double dp) const noexcept;
 
     double sr = 44100.0;
@@ -68,10 +84,10 @@ private:
     GlobParamPtrs globPtrs;
     SubSettings sub;
     GlobSettings glob;
-    CurveSlot *pitchSlot = nullptr, *ampSlot = nullptr;
+    std::array<CurveSlot*, kNumCurves> slotPtr {};
 
     Layer cur, old;
-    std::vector<double> stScratch;
+    std::vector<double> stScratch, ntScratch; // user pitch offset / note-delta (semitones) per sample
     std::vector<float> tmp;
 
     // shared per-sample state
