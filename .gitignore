@@ -3,4 +3,4 @@ build-*/
 .vs/
 *.user
 
-.claude/
+.claude/worktrees/
