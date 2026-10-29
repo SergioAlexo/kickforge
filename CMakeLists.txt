@@ -34,7 +34,12 @@ set(KICKFORGE_ENGINE_SOURCES
     Source/click/ClickGen.cpp
     Source/fx/FxParams.cpp
     Source/fx/FxChain.cpp
-    Source/fx/FxSlot.cpp)
+    Source/fx/FxSlot.cpp
+    Source/ui/KfLookAndFeel.cpp
+    Source/ui/Analyser.cpp
+    Source/ui/CurveEditor.cpp
+    Source/ui/Views.cpp
+    Source/ui/Panels.cpp)
 
 juce_add_plugin(Kickforge
     COMPANY_NAME "Kickforge"
@@ -74,7 +79,8 @@ add_executable(KickforgeTests
     tests/RenderTests.cpp
     tests/ClickTests.cpp
     tests/SynthTests.cpp
-    tests/FxTests.cpp)
+    tests/FxTests.cpp
+    tests/UiTests.cpp)
 target_include_directories(KickforgeTests PRIVATE Source)
 target_compile_definitions(KickforgeTests PRIVATE
     JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_STANDALONE_APPLICATION=1)

@@ -64,6 +64,7 @@ void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     juce::ScopedNoDenormals noDenormals;
     buffer.clear();
     const int n = buffer.getNumSamples();
+    keyboardState.processNextMidiBuffer (midi, 0, n, true);
 
     // Sample-accurate: render up to each MIDI event, then apply it.
     int pos = 0;
@@ -82,6 +83,7 @@ void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     buffer.applyGain (0, 0, n, g);
     for (int ch = 1; ch < buffer.getNumChannels(); ++ch)
         buffer.copyFrom (ch, 0, buffer, 0, 0, n);
+    scopeFifo.push (buffer.getReadPointer (0), n);
     midi.clear();
 }
 

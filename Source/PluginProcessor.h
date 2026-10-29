@@ -3,6 +3,7 @@
 #include "synth/SubVoice.h"
 #include "click/ClickLayer.h"
 #include "fx/FxChain.h"
+#include "ui/AudioFifo.h"
 
 class KickforgeProcessor : public juce::AudioProcessor
 {
@@ -37,6 +38,13 @@ public:
 
     /** Sub-layer pitch/amp/... curves (thread-safe swap, mirrored into apvts.state "CURVES"). */
     kf::SubCurves& getSubCurves() noexcept { return subCurves; }
+
+    // ---- UI hooks (Source/ui) ----
+    kf::ClickLayer& getClick() noexcept { return click; }
+    /** Final mono output, pushed from processBlock for the scope / analyser. */
+    kf::AudioFifo scopeFifo;
+    /** UI-injected notes (Audition button); merged into the MIDI stream at the start of each block. */
+    juce::MidiKeyboardState keyboardState;
 
 private:
     void handleMidi (const juce::MidiMessage&);
