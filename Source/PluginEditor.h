@@ -20,7 +20,7 @@ public:
     void resized() override;
     void paint (juce::Graphics&) override {}
 
-    /** Selects the curve shown in the editor: 0..3 = sub Pitch/Amp/Drive/Harm, 4..7 = click layer 1..4 envelope. */
+    /** Selects the curve shown in the editor: 0..4 = sub Pitch/Amp/Drive/Harm/KeyTrack, 5..8 = click layer 1..4 envelope. */
     void selectCurve (int index);
     void selectTab (int index);
     int getCurveIndex() const noexcept { return curveIndex; }
@@ -51,13 +51,14 @@ private:
     juce::Label fundamental;
     HoldButton audition;
 
-    std::array<juce::TextButton, 8> curveButtons;
+    std::array<juce::TextButton, 9> curveButtons;
     kf::ui::CurveEditor curveEditor;
     kf::ui::WaveformView waveform;
     kf::ui::SpectrumView spectrum;
 
-    std::array<juce::TextButton, 6> tabButtons;
+    std::array<juce::TextButton, 7> tabButtons;
     kf::ui::SubPanel subPanel;
+    kf::ui::HarmonicsPanel harmPanel;
     kf::ui::ClickPanel clickPanel;
     kf::ui::FxPanel fxPanel;
     kf::ui::EqPanel eqPanel;

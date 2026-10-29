@@ -29,10 +29,14 @@ SubPanel::SubPanel (APVTS& s)
     : level (s, "sub_gain", "Level"), phase (s, "sub_phase", "Start Phase"), root (s, "sub_root", "Root Note"),
       tune (s, "sub_tune", "Tune"), fine (s, "sub_fine", "Fine"), length (s, "sub_length", "Length"),
       release (s, "sub_release", "Release"), wave (s, "sub_wave"), pitchMode (s, "sub_pitchmode"), gate (s, "sub_gate"),
-      keyTrack (s, "sub_keytrack", "Key track"), mute (s, "sub_mute", "Mute")
+      keyTrack (s, "sub_keytrack", "Key track"), mute (s, "sub_mute", "Mute"),
+      drive (s, "sub_drive", "Drive"), lockPos (s, "sub_lockpos", "Lock Pos"), delay (s, "sub_delay", "Start Offset"),
+      pan (s, "sub_pan", "Pan"), bus (s, "sub_bus"), lock (s, "sub_lock", "Phase lock")
 {
+    lockPos.slider.setTooltip ("Normalized curve time at which the phase is locked. Right-click a Pitch curve node > Phase lock here.");
     for (auto* c : std::initializer_list<juce::Component*> { &level, &phase, &root, &tune, &fine, &length, &release,
-                                                             &wave, &pitchMode, &gate, &keyTrack, &mute })
+                                                             &drive, &lockPos, &delay, &pan,
+                                                             &wave, &pitchMode, &gate, &keyTrack, &mute, &bus, &lock })
         addAndMakeVisible (c);
 }
 
@@ -45,19 +49,59 @@ void SubPanel::paint (juce::Graphics& g)
     g.drawText ("Waveform", 12, 150, 140, 14, juce::Justification::centredLeft);
     g.drawText ("Pitch curve units", 160, 150, 140, 14, juce::Justification::centredLeft);
     g.drawText ("Gate mode", 308, 150, 140, 14, juce::Justification::centredLeft);
-    g.drawText ("Edit the Pitch / Amp / Drive / Harmonic curves in the editor above.\n"
-                "Double-click adds a node, drag moves it, drag a segment to bend it.",
-                12, 240, 600, 40, juce::Justification::topLeft);
+    g.drawText ("FX bus", 654, 150, 100, 14, juce::Justification::centredLeft);
+    g.drawFittedText ("Edit the Pitch / Amp / Drive / Harmonic / Key track curves in the editor above.\n"
+                "Double-click adds a node, drag moves it, drag a segment to bend it.\n"
+                "Phase lock: right-click a Pitch node > Phase lock here, to set where the phase is aligned.",
+                12, 240, 700, 56, juce::Justification::topLeft, 3);
 }
 
 void SubPanel::resized()
 {
-    flowCells ({ 12, 30, 7 * kKnobW, kKnobH }, { &level, &phase, &root, &tune, &fine, &length, &release }, kKnobW, kKnobH);
+    flowCells ({ 12, 30, 11 * kKnobW, kKnobH }, { &level, &phase, &root, &tune, &fine, &length, &release, &drive, &lockPos, &delay, &pan }, kKnobW, kKnobH);
     wave.setBounds (12, 168, 140, 26);
     pitchMode.setBounds (160, 168, 140, 26);
     gate.setBounds (308, 168, 140, 26);
     keyTrack.setBounds (470, 168, 100, 26);
     mute.setBounds (576, 168, 70, 26);
+    bus.setBounds (654, 168, 110, 26);
+    lock.setBounds (780, 168, 110, 26);
+}
+
+// ============================================================ Sub harmonics
+HarmonicsPanel::HarmonicsPanel (APVTS& s)
+{
+    for (int i = 0; i < kN; ++i)
+    {
+        const auto n = juce::String (i + 1);
+        knobs.push_back (std::make_unique<Knob> (s, "sub_h" + n + "_semi", "Pitch"));
+        knobs.push_back (std::make_unique<Knob> (s, "sub_h" + n + "_gain", "Gain"));
+        knobs.push_back (std::make_unique<Knob> (s, "sub_h" + n + "_decay", "Decay"));
+    }
+    for (auto& k : knobs) addAndMakeVisible (*k);
+}
+
+void HarmonicsPanel::paint (juce::Graphics& g)
+{
+    PanelBase::paint (g);
+    heading (g, "SUB HARMONICS", { 12, 4, 160, 18 });
+    g.setColour (col::dim);
+    g.setFont (juce::Font (juce::FontOptions (12.0f)));
+    g.drawText ("Added partials, pitch relative to the sub; the Harmonics curve scales their overall amount over time.",
+                170, 4, 920, 18, juce::Justification::centredLeft);
+    g.setFont (juce::Font (juce::FontOptions (12.0f, juce::Font::bold)));
+    for (int i = 0; i < kN; ++i)
+    {
+        g.setColour (col::accent2);
+        g.drawText ("H" + juce::String (i + 1), 12 + i * 120, 24, 112, 14, juce::Justification::centred);
+    }
+}
+
+void HarmonicsPanel::resized()
+{
+    for (int i = 0; i < kN; ++i)
+        for (int k = 0; k < 3; ++k)
+            knobs[(size_t) (i * 3 + k)]->setBounds (12 + i * 120 + 12, 40 + k * 96, 88, 94);
 }
 
 // ============================================================ Click layers
@@ -341,9 +385,18 @@ void DynPanel::resized()
 GlobalPanel::GlobalPanel (APVTS& s)
     : master (s, "glob_gain", "Master"), clickMaster (s, "click_gain", "Click Master"), a4 (s, "glob_a4", "A4 Tuning"),
       bend (s, "glob_bend", "Bend Range"), glide (s, "glob_glide", "Glide"), vel (s, "glob_velsens", "Velocity"),
-      legato (s, "glob_legato", "Legato")
+      legato (s, "glob_legato", "Legato"),
+      trigEnable (s, "trig_enable", "Enable"), trigDyn (s, "trig_dyn", "Dynamic vel"),
+      moEnable (s, "midiout_enable", "Enable"), moFollow (s, "midiout_follow", "Follow note"),
+      trigHp (s, "trig_hp", "High-pass"), trigLp (s, "trig_lp", "Low-pass"), trigThresh (s, "trig_thresh", "Threshold"),
+      trigOff (s, "trig_offret", "Off return"), trigRetrig (s, "trig_retrig", "Retrig return"),
+      trigNote (s, "trig_note", "Note"), trigVel (s, "trig_vel", "Velocity"),
+      moNote (s, "midiout_note", "Note"), moChan (s, "midiout_chan", "Channel"), moLen (s, "midiout_len", "Length")
 {
-    for (auto* c : std::initializer_list<juce::Component*> { &master, &clickMaster, &a4, &bend, &glide, &vel, &legato })
+    for (auto* c : std::initializer_list<juce::Component*> { &master, &clickMaster, &a4, &bend, &glide, &vel, &legato,
+                                                             &trigEnable, &trigDyn, &moEnable, &moFollow, &trigHp, &trigLp,
+                                                             &trigThresh, &trigOff, &trigRetrig, &trigNote, &trigVel,
+                                                             &moNote, &moChan, &moLen })
         addAndMakeVisible (c);
 }
 
@@ -353,15 +406,25 @@ void GlobalPanel::paint (juce::Graphics& g)
     heading (g, "GLOBAL / MIDI", { 12, 6, 200, 20 });
     g.setColour (col::dim);
     g.setFont (juce::Font (juce::FontOptions (12.0f)));
-    g.drawText ("Any MIDI note triggers the kick; with Key track on, the note transposes the pitch curve.\n"
+    g.drawFittedText ("Any MIDI note triggers the kick; with Key track on, the note transposes the pitch curve.\n"
                 "The pitch wheel bends the sub by the bend range. Glide + Legato slide between overlapping notes.\n"
                 "Velocity sets how strongly note velocity scales the level (0 = fixed).",
-                12, 190, 800, 60, juce::Justification::topLeft);
+                12, 262, 1070, 56, juce::Justification::topLeft, 3);
+    heading (g, "SIDECHAIN TRIGGER", { 12, 130, 300, 20 });
+    g.setColour (col::dim);
+    g.drawText ("Fires the kick from the sidechain input level (drum replacement).", 170, 130, 600, 20, juce::Justification::centredLeft);
+    heading (g, "MIDI OUT", { 720, 6, 200, 20 });
 }
 
 void GlobalPanel::resized()
 {
     flowCells ({ 12, 30, 6 * kKnobW, kKnobH }, { &master, &clickMaster, &a4, &bend, &glide, &vel }, kKnobW, kKnobH);
     legato.setBounds (12 + 6 * kKnobW + 20, 58, 90, 26);
+    trigEnable.setBounds (12, 160, 90, 26);
+    trigDyn.setBounds (12, 190, 100, 26);
+    flowCells ({ 112, 152, 7 * kKnobW, kKnobH }, { &trigHp, &trigLp, &trigThresh, &trigOff, &trigRetrig, &trigNote, &trigVel }, kKnobW, kKnobH);
+    moEnable.setBounds (720, 30, 100, 26);
+    moFollow.setBounds (720, 60, 100, 26);
+    flowCells ({ 826, 30, 3 * kKnobW, kKnobH }, { &moNote, &moChan, &moLen }, kKnobW, kKnobH);
 }
 } // namespace kf::ui

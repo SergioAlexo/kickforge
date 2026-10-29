@@ -33,9 +33,21 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 private:
-    Knob level, phase, root, tune, fine, length, release;
-    Choice wave, pitchMode, gate;
-    Toggle keyTrack, mute;
+    Knob level, phase, root, tune, fine, length, release, drive, lockPos, delay, pan;
+    Choice wave, pitchMode, gate, bus;
+    Toggle keyTrack, mute, lock;
+};
+
+/** Sub additive harmonics: 9 columns of pitch / gain / decay (sub_hN_*). */
+class HarmonicsPanel : public PanelBase
+{
+public:
+    explicit HarmonicsPanel (APVTS&);
+    void paint (juce::Graphics&) override;
+    void resized() override;
+private:
+    static constexpr int kN = 9;
+    std::vector<std::unique_ptr<Knob>> knobs; // [i*3 + {0 semi,1 gain,2 decay}]
 };
 
 /** One click/sample layer column: generator, drop zone / sample status, knobs. (C-08) */
@@ -154,5 +166,7 @@ public:
 private:
     Knob master, clickMaster, a4, bend, glide, vel;
     Toggle legato;
+    Toggle trigEnable, trigDyn, moEnable, moFollow;
+    Knob trigHp, trigLp, trigThresh, trigOff, trigRetrig, trigNote, trigVel, moNote, moChan, moLen;
 };
 } // namespace kf::ui

@@ -28,7 +28,7 @@ void KickforgeEditor::Content::paint (juce::Graphics& g)
 KickforgeEditor::KickforgeEditor (KickforgeProcessor& p)
     : AudioProcessorEditor (&p), proc (p), presetBar (p),
       curveEditor(), waveform (analyser), spectrum (analyser),
-      subPanel (p.apvts), clickPanel (p.apvts, p.getClickLayer(), [this] (int l) { selectCurve (4 + l); }),
+      subPanel (p.apvts), harmPanel (p.apvts), clickPanel (p.apvts, p.getClickLayer(), [this] (int l) { selectCurve (5 + l); }),
       fxPanel (p.apvts), eqPanel (p.apvts, analyser), dynPanel (p.apvts), globalPanel (p.apvts)
 {
     setLookAndFeel (&lnf);
@@ -50,7 +50,7 @@ KickforgeEditor::KickforgeEditor (KickforgeProcessor& p)
         else proc.keyboardState.noteOff (1, note, 0.0f);
     };
 
-    static const char* curveNames[] = { "Pitch", "Amp", "Drive", "Harmonics", "Click 1 Env", "Click 2 Env", "Click 3 Env", "Click 4 Env" };
+    static const char* curveNames[] = { "Pitch", "Amp", "Drive", "Harmonics", "Key Track", "Click 1", "Click 2", "Click 3", "Click 4" };
     for (size_t i = 0; i < curveButtons.size(); ++i)
     {
         auto& b = curveButtons[i];
@@ -64,8 +64,8 @@ KickforgeEditor::KickforgeEditor (KickforgeProcessor& p)
     content.addAndMakeVisible (waveform);
     content.addAndMakeVisible (spectrum);
 
-    static const char* tabNames[] = { "Sub", "Click Layers", "FX", "EQ", "Dynamics", "Global / MIDI" };
-    juce::Component* panels[] = { &subPanel, &clickPanel, &fxPanel, &eqPanel, &dynPanel, &globalPanel };
+    static const char* tabNames[] = { "Sub", "Harmonics", "Click Layers", "FX", "EQ", "Dynamics", "Global / MIDI" };
+    juce::Component* panels[] = { &subPanel, &harmPanel, &clickPanel, &fxPanel, &eqPanel, &dynPanel, &globalPanel };
     for (size_t i = 0; i < tabButtons.size(); ++i)
     {
         auto& b = tabButtons[i];
@@ -105,7 +105,7 @@ void KickforgeEditor::resized()
     audition.setBounds (976, 10, 130, 32);
 
     for (size_t i = 0; i < curveButtons.size(); ++i)
-        curveButtons[i].setBounds (8 + (int) i * 92, 58, 88, 24);
+        curveButtons[i].setBounds (8 + (int) i * 82, 58, 78, 24);
     curveEditor.setBounds (8, 86, 736, 280);
     waveform.setBounds (752, 58, 360, 152);
     spectrum.setBounds (752, 214, 360, 152);
@@ -113,13 +113,13 @@ void KickforgeEditor::resized()
     for (size_t i = 0; i < tabButtons.size(); ++i)
         tabButtons[i].setBounds (8 + (int) i * 112, 372, 108, 26);
     const juce::Rectangle<int> r (8, 402, 1104, 330);
-    for (auto* c : std::initializer_list<juce::Component*> { &subPanel, &clickPanel, &fxPanel, &eqPanel, &dynPanel, &globalPanel })
+    for (auto* c : std::initializer_list<juce::Component*> { &subPanel, &harmPanel, &clickPanel, &fxPanel, &eqPanel, &dynPanel, &globalPanel })
         c->setBounds (r);
 }
 
 void KickforgeEditor::selectTab (int i)
 {
-    juce::Component* panels[] = { &subPanel, &clickPanel, &fxPanel, &eqPanel, &dynPanel, &globalPanel };
+    juce::Component* panels[] = { &subPanel, &harmPanel, &clickPanel, &fxPanel, &eqPanel, &dynPanel, &globalPanel };
     for (size_t k = 0; k < tabButtons.size(); ++k)
         panels[k]->setVisible ((int) k == i);
     tabButtons[(size_t) i].setToggleState (true, juce::dontSendNotification);
@@ -127,7 +127,10 @@ void KickforgeEditor::selectTab (int i)
 
 void KickforgeEditor::selectCurve (int index)
 {
-    curveIndex = juce::jlimit (0, 7, index);
+    curveIndex = juce::jlimit (0, 8, index);
+    if (curveIndex == 3) selectTab (1);   // Harmonics curve -> harmonics panel
+    else if (curveIndex >= 5 && curveIndex <= 8) selectTab (2);
+    else if (curveIndex < 5 && tabButtons[1].getToggleState()) selectTab (0);
     curveButtons[(size_t) curveIndex].setToggleState (true, juce::dontSendNotification);
     curveEditor.setSource (makeSource (curveIndex));
 }
@@ -139,10 +142,10 @@ CurveEditor::Source KickforgeEditor::makeSource (int index)
     CurveEditor::Source s;
     auto* proc_ = &proc;
 
-    if (index < 4)
+    if (index < 5)
     {
         const auto id = (kf::SubCurveId) index;
-        static const char* names[] = { "PITCH", "AMPLITUDE", "DRIVE", "HARMONICS" };
+        static const char* names[] = { "PITCH", "AMPLITUDE", "DRIVE", "HARMONICS", "KEY TRACKING" };
         s.name = names[index];
         s.get = [proc_, id] { return proc_->getSubCurves().getCurve (id); };
         s.set = [proc_, id] (const kf::Curve& c) { proc_->getSubCurves().setCurve (id, c); };
@@ -157,6 +160,20 @@ CurveEditor::Source KickforgeEditor::makeSource (int index)
             s.hardMax = hz ? 4000.0 : 96.0;
             s.unit = hz ? "Hz" : "st";
             s.colour = col::accent;
+            s.onLockHere = [ap] (double t)
+            {
+                auto setP = [ap] (const char* id, float plain)
+                {
+                    if (auto* p = ap->getParameter (id))
+                    {
+                        p->beginChangeGesture();
+                        p->setValueNotifyingHost (p->convertTo0to1 (plain));
+                        p->endChangeGesture();
+                    }
+                };
+                setP ("sub_lockpos", (float) juce::jlimit (0.0, 1.0, t));
+                setP ("sub_lock", 1.0f);
+            };
             s.snapValue = [raw] (double v)
             {
                 return snapPitchValue (v, raw ("sub_pitchmode") > 0.5, raw ("sub_root"), raw ("sub_tune"), raw ("sub_fine"), raw ("glob_a4"));
@@ -171,14 +188,15 @@ CurveEditor::Source KickforgeEditor::makeSource (int index)
         {
             s.vmin = 0.0; s.vmax = 1.0; s.hardMin = 0.0; s.hardMax = 1.0;
             s.colour = id == kf::SubCurveId::Amp ? col::accent2
-                     : id == kf::SubCurveId::Drive ? juce::Colour (0xffe0507a) : juce::Colour (0xffb58cff);
+                     : id == kf::SubCurveId::Drive ? juce::Colour (0xffe0507a)
+                     : id == kf::SubCurveId::KeyTrack ? juce::Colour (0xff7ac0ff) : juce::Colour (0xffb58cff);
             if (id == kf::SubCurveId::Amp)
                 s.valueText = [] (double, double v) { return juce::String (juce::Decibels::gainToDecibels (v, -100.0), 1) + " dB"; };
         }
     }
     else
     {
-        const int l = index - 4;
+        const int l = index - 5;
         s.name = "CLICK " + juce::String (l + 1) + " ENVELOPE";
         s.get = [proc_, l] { return proc_->getClickLayer().getEnvelope (l); };
         s.set = [proc_, l] (const kf::Curve& c) { proc_->getClickLayer().setEnvelope (l, c); };
