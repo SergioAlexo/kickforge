@@ -35,10 +35,14 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
+    /** Sub-layer pitch/amp/... curves (thread-safe swap, mirrored into apvts.state "CURVES"). */
+    kf::SubCurves& getSubCurves() noexcept { return subCurves; }
+
 private:
     void handleMidi (const juce::MidiMessage&);
     void renderMono (juce::AudioBuffer<float>&, int start, int num);
 
+    kf::SubCurves subCurves { apvts };
     kf::SubVoice sub;
     kf::ClickLayer click;
     kf::FxChain fx;

@@ -2,11 +2,70 @@
 
 namespace kf
 {
+namespace
+{
+using PID = juce::ParameterID;
+using Range = juce::NormalisableRange<float>;
+
+std::unique_ptr<juce::AudioParameterFloat> mkFloat (const char* id, const char* name, Range r, float def,
+                                                    const char* label = "")
+{
+    return std::make_unique<juce::AudioParameterFloat> (PID { id, 1 }, name, r, def,
+                                                        juce::AudioParameterFloatAttributes().withLabel (label));
+}
+}
+
 void addSubParams (juce::AudioProcessorValueTreeState::ParameterLayout& layout)
 {
-    // Placeholder - replace with the real synth parameter set.
-    layout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID { "sub_level", 1 }, "Sub Level",
-        juce::NormalisableRange<float> (0.0f, 1.0f), 1.0f));
+    layout.add (mkFloat ("sub_gain", "Sub Level", Range (-60.0f, 6.0f, 0.01f, 2.5f), 0.0f, "dB"));
+    layout.add (std::make_unique<juce::AudioParameterBool> (PID { "sub_mute", 1 }, "Sub Mute", false));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        PID { "sub_wave", 1 }, "Sub Wave",
+        juce::StringArray { "Sine", "Triangle", "Saw", "Square", "Soft Sine" }, 0));
+    layout.add (mkFloat ("sub_phase", "Sub Start Phase", Range (0.0f, 360.0f, 0.1f), 0.0f, "deg"));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        PID { "sub_pitchmode", 1 }, "Pitch Curve Units", juce::StringArray { "Semitones", "Hz" }, 0));
+    layout.add (mkFloat ("sub_root", "Sub Root Note", Range (12.0f, 96.0f, 1.0f), 33.0f, "note"));
+    layout.add (mkFloat ("sub_tune", "Sub Tune", Range (-24.0f, 24.0f, 0.01f), 0.0f, "st"));
+    layout.add (mkFloat ("sub_fine", "Sub Fine Tune", Range (-100.0f, 100.0f, 0.1f), 0.0f, "ct"));
+    layout.add (std::make_unique<juce::AudioParameterBool> (PID { "sub_keytrack", 1 }, "Sub Key Tracking", true));
+    layout.add (mkFloat ("sub_length", "Sub Length", Range (20.0f, 4000.0f, 1.0f, 0.4f), 500.0f, "ms"));
+    layout.add (std::make_unique<juce::AudioParameterChoice> (
+        PID { "sub_gate", 1 }, "Sub Gate", juce::StringArray { "One-shot", "Gate" }, 0));
+    layout.add (mkFloat ("sub_release", "Sub Release", Range (1.0f, 2000.0f, 1.0f, 0.4f), 50.0f, "ms"));
+}
+
+void SubParamPtrs::bind (juce::AudioProcessorValueTreeState& a)
+{
+    gain = a.getRawParameterValue ("sub_gain");
+    mute = a.getRawParameterValue ("sub_mute");
+    wave = a.getRawParameterValue ("sub_wave");
+    phase = a.getRawParameterValue ("sub_phase");
+    pitchMode = a.getRawParameterValue ("sub_pitchmode");
+    root = a.getRawParameterValue ("sub_root");
+    tune = a.getRawParameterValue ("sub_tune");
+    fine = a.getRawParameterValue ("sub_fine");
+    keyTrack = a.getRawParameterValue ("sub_keytrack");
+    length = a.getRawParameterValue ("sub_length");
+    gate = a.getRawParameterValue ("sub_gate");
+    release = a.getRawParameterValue ("sub_release");
+    bound = true;
+}
+
+void SubParamPtrs::read (SubSettings& s) const noexcept
+{
+    if (! bound) return;
+    s.gainDb = gain->load();
+    s.mute = mute->load() > 0.5f;
+    s.wave = (SubWave) juce::jlimit (0, (int) SubWave::Count - 1, (int) (wave->load() + 0.5f));
+    s.startPhaseDeg = phase->load();
+    s.pitchMode = pitchMode->load() > 0.5f ? PitchMode::Hz : PitchMode::Semitones;
+    s.rootNote = root->load();
+    s.tuneSemis = tune->load();
+    s.fineCents = fine->load();
+    s.keyTrack = keyTrack->load() > 0.5f;
+    s.lengthMs = length->load();
+    s.gate = gate->load() > 0.5f ? GateMode::Gate : GateMode::OneShot;
+    s.releaseMs = release->load();
 }
 }

@@ -24,26 +24,26 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 
 ## S - Sub / body synth
 - [ ] S-01 Up to 5 layers total, each layer is either a synth sub or a sample (click); shared layer slots with C-xx
-- [ ] S-02 Sub layer fundamental oscillator, sine-based
-- [ ] S-03 Additional oscillator waveform shapes beyond sine (unverified; plan: sine, triangle, saw-ish, square-ish, soft-clipped sine)
+- [x] S-02 Sub layer fundamental oscillator, sine-based
+- [x] S-03 Additional oscillator waveform shapes beyond sine (unverified; plan: sine, triangle, saw-ish, square-ish, soft-clipped sine)
 - [ ] S-04 Up to 9 additional harmonics per sub layer, each individually tuned (harmonic ratio / semitone offset)
 - [ ] S-05 Per-harmonic Gain control
 - [ ] S-06 Per-harmonic Decay control
 - [ ] S-07 Harmonics-section amount envelope curve (added in a KICK 3 beta)
-- [ ] S-08 Pitch envelope per layer, node-based curve editor (see U-xx)
-- [ ] S-09 Amp (volume) envelope per layer, node-based curve editor
-- [ ] S-10 Pitch curve Bezier segments (curvature per segment)
-- [ ] S-11 Amp curve Bezier segments
+- [x] S-08 Pitch envelope per layer, node-based curve editor (see U-xx)
+- [x] S-09 Amp (volume) envelope per layer, node-based curve editor
+- [x] S-10 Pitch curve Bezier segments (curvature per segment)
+- [x] S-11 Amp curve Bezier segments
 - [ ] S-12 Pitch snap: node pitch values snap to musical notes (toggle)
-- [ ] S-13 Base tuning of sub in Hz and/or note name with fine tune in cents (unverified ranges; suggested 20-400 Hz, +/-100 cents)
-- [ ] S-14 Key tracking on/off per layer
+- [x] S-13 Base tuning of sub in Hz and/or note name with fine tune in cents (unverified ranges; suggested 20-400 Hz, +/-100 cents)
+- [x] S-14 Key tracking on/off per layer
 - [ ] S-15 Selective key tracking: choose which pitch-curve node(s) follow MIDI note, so the tail transposes and the initial thump stays fixed
-- [ ] S-16 Per-layer phase offset, 180 degree flip at minimum (full 0-360 rotation, unverified)
+- [x] S-16 Per-layer phase offset, 180 degree flip at minimum (full 0-360 rotation, unverified)
 - [ ] S-17 Phase lock: right-click a node locks the phase of the remaining tail so the early part can be edited without realigning the tail
-- [ ] S-18 Layer length / overall decay scaling that stretches the envelopes (length control; unverified exact behavior)
+- [x] S-18 Layer length / overall decay scaling that stretches the envelopes (length control; unverified exact behavior)
 - [ ] S-19 Drive amount per sub layer with its own envelope curve (added in a KICK 3 beta)
-- [ ] S-20 Gate on the voice (end-of-sound gate / note-off behavior; unverified specifics)
-- [ ] S-21 Layer mute/solo and per-layer volume (unverified)
+- [x] S-20 Gate on the voice (end-of-sound gate / note-off behavior; unverified specifics)
+- [x] S-21 Layer mute/solo and per-layer volume (unverified)
 - [ ] S-22 Layer delay/start offset for the sub (developer did not commit to this; optional)
 
 ## C - Click / sample layers
@@ -87,18 +87,18 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [ ] F-26 Master output gain (unverified)
 
 ## G - Global / MIDI
-- [ ] G-01 MIDI note triggers the kick; note number sets pitch where key tracking is on
-- [ ] G-02 Velocity affects level (mapping unverified)
-- [ ] G-03 Mono / polyphony behavior (unverified; plan: mono with declick, retrigger)
-- [ ] G-04 Glide / portamento (unverified; no source mentions it)
-- [ ] G-05 Pitch-bend response (unverified)
+- [x] G-01 MIDI note triggers the kick; note number sets pitch where key tracking is on
+- [x] G-02 Velocity affects level (mapping unverified)
+- [x] G-03 Mono / polyphony behavior (unverified; plan: mono with declick, retrigger)
+- [x] G-04 Glide / portamento (unverified; no source mentions it)
+- [x] G-05 Pitch-bend response (unverified)
 - [ ] G-06 Trigger tab: external sidechain input for drum replacement
 - [ ] G-07 Trigger input filter
 - [ ] G-08 Trigger Threshold
 - [ ] G-09 Trigger Off Return (release threshold)
 - [ ] G-10 Trigger Retrigger Return (re-arm hysteresis)
 - [ ] G-11 Output MIDI notes to drive other instruments (single low-quality source; unverified)
-- [ ] G-12 Host automation of all parameters (users requested full automation exposure; unverified as present)
+- [x] G-12 Host automation of all parameters (users requested full automation exposure; unverified as present)
 - [ ] G-13 Output routing: single stereo out (multi-out unverified)
 - [ ] G-14 Formats: VST3 (AU/AAX out of scope for us)
 
