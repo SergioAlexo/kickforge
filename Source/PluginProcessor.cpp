@@ -7,6 +7,7 @@ KickforgeProcessor::KickforgeProcessor()
       apvts (*this, nullptr, "STATE", kf::createLayout())
 {
     gainParam = apvts.getRawParameterValue ("glob_gain");
+    fx.bind (apvts);
 }
 
 void KickforgeProcessor::prepareToPlay (double sr, int block)
@@ -14,6 +15,7 @@ void KickforgeProcessor::prepareToPlay (double sr, int block)
     sub.prepare (sr, block);
     click.prepare (sr, block);
     fx.prepare (sr, block);
+    setLatencySamples (fx.getLatencySamples());
 }
 
 bool KickforgeProcessor::isBusesLayoutSupported (const BusesLayout& l) const
@@ -61,6 +63,8 @@ void KickforgeProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
         handleMidi (meta.getMessage());
     }
     renderMono (buffer, pos, n - pos);
+    if (fx.getLatencySamples() != getLatencySamples()) // limiter lookahead changed
+        setLatencySamples (fx.getLatencySamples());
 
     const float g = juce::Decibels::decibelsToGain (gainParam != nullptr ? gainParam->load() : 0.0f);
     buffer.applyGain (0, 0, n, g);

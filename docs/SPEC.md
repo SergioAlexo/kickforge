@@ -59,32 +59,32 @@ curves; undo/redo; zoom/pan; pitch snap; gate. KICK 2 presets are loadable in KI
 - [ ] C-10 Swap the top-end sample after AI import without touching the sub (see P-xx)
 
 ## F - FX
-- [ ] F-01 FX section with 2 effect buses plus 1 master bus; each bus holds 2 effects
+- [x] F-01 FX section with 2 effect buses plus 1 master bus; each bus holds 2 effects
 - [ ] F-02 Per-layer assignment of layers to bus A / bus B / master-only
-- [ ] F-03 About 15 effects selectable in any slot (swappable)
-- [ ] F-04 Distortion: Clipper
-- [ ] F-05 Distortion: Tube
-- [ ] F-06 Distortion: Wave (waveshaper)
-- [ ] F-07 Distortion: Tape
-- [ ] F-08 Distortion: Drive
-- [ ] F-09 Distortion: Bit crush
-- [ ] F-10 Complex waveshaper
-- [ ] F-11 Brassify (harmonic-brightening effect; exact algorithm unverified)
-- [ ] F-12 Ring modulator
-- [ ] F-13 Delay
-- [ ] F-14 Reverb
-- [ ] F-15 Filter (type list unverified)
-- [ ] F-16 EQ as an insertable effect
-- [ ] F-17 Standard compressor
-- [ ] F-18 1176-style (FET) compressor
-- [ ] F-19 4 macro knobs, each controlling one effect parameter (mapping to arbitrary param, range unverified)
-- [ ] F-20 Dedicated EQ tab: 2 parametric bands plus low shelf and high shelf
+- [x] F-03 About 15 effects selectable in any slot (swappable)
+- [x] F-04 Distortion: Clipper
+- [x] F-05 Distortion: Tube
+- [x] F-06 Distortion: Wave (waveshaper)
+- [x] F-07 Distortion: Tape
+- [x] F-08 Distortion: Drive
+- [x] F-09 Distortion: Bit crush
+- [x] F-10 Complex waveshaper
+- [x] F-11 Brassify (harmonic-brightening effect; exact algorithm unverified)
+- [x] F-12 Ring modulator
+- [x] F-13 Delay
+- [x] F-14 Reverb
+- [x] F-15 Filter (type list unverified)
+- [x] F-16 EQ as an insertable effect
+- [x] F-17 Standard compressor
+- [x] F-18 1176-style (FET) compressor
+- [x] F-19 4 macro knobs, each controlling one effect parameter (mapping to arbitrary param, range unverified)
+- [x] F-20 Dedicated EQ tab: 2 parametric bands plus low shelf and high shelf
 - [ ] F-21 EQ tab spectrum analyser (spectral display)
-- [ ] F-22 Output limiter on master with 3 release settings
-- [ ] F-23 Output limiter with 3 lookahead settings
-- [ ] F-24 Limiter adds saturation when driven hard; input gain/ceiling controls (unverified)
-- [ ] F-25 Oversampling / quality setting (not mentioned in any source; unverified)
-- [ ] F-26 Master output gain (unverified)
+- [x] F-22 Output limiter on master with 3 release settings
+- [x] F-23 Output limiter with 3 lookahead settings
+- [x] F-24 Limiter adds saturation when driven hard; input gain/ceiling controls (unverified)
+- [x] F-25 Oversampling / quality setting (not mentioned in any source; unverified)
+- [x] F-26 Master output gain (unverified)
 
 ## G - Global / MIDI
 - [ ] G-01 MIDI note triggers the kick; note number sets pitch where key tracking is on
