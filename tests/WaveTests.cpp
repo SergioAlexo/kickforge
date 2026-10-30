@@ -233,6 +233,18 @@ TEST_CASE ("wave: editor paints with all layers on at several sizes; toggles per
         }
     }
 
+    // one shared absolute-ms timeline on every tab
+    {
+        const double axis = ke->getSharedAxisMs();
+        REQUIRE (axis >= p.apvts.getRawParameterValue ("sub_length")->load());
+        for (int c : { 0, 1, 5 })
+        {
+            ke->selectCurve (c);
+            REQUIRE (ce.view.t0 == 0.0);
+            REQUIRE (ce.view.t1 * ce.getLengthMs() == Catch::Approx (axis).epsilon (0.01));
+        }
+    }
+
     // persisted as UI state, not a parameter
     p.getWaveSettings().clicks = false;
     juce::MemoryBlock mb;
@@ -260,6 +272,11 @@ TEST_CASE ("wave: editor paints with all layers on at several sizes; toggles per
         snap (0, "wave_pitch.png");
         snap (1, "wave_amp.png");
         snap (5, "wave_click1.png");
+        ke->selectCurve (0);
+        ce.view.t1 = 0.12; // zoom into the attack (60 ms)
+        auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
+        juce::FileOutputStream os (juce::File (out).getChildFile ("wave_pitch_zoom.png"));
+        if (os.openedOk()) { os.setPosition (0); os.truncate(); juce::PNGImageFormat().writeImageToStream (img, os); }
     }
     ed.reset();
     dir.deleteRecursively();

@@ -28,6 +28,7 @@ public:
     int getCurveIndex() const noexcept { return curveIndex; }
     kf::ui::CurveEditor& getCurveEditor() noexcept { return curveEditor; }
     kf::ui::WaveService& getWaveService() noexcept { return waveService; }
+    double getSharedAxisMs() const { return sharedAxisMs(); }
     kf::ui::LiveToggle& getLiveToggle() noexcept { return liveToggle; }
     kf::ui::ReferenceStrip& getRefStrip() noexcept { return refStrip; }
     /** Runs one timer tick (tests: drains the scope FIFO and refreshes the views). */
@@ -48,6 +49,8 @@ private:
     void timerCallback() override;
     kf::ui::CurveEditor::Source makeSource (int index);
     juce::String fundamentalText() const;
+    /** One absolute-ms timeline for every curve tab: max(sub length, audible end of the rendered layers). */
+    double sharedAxisMs() const;
 
     KickforgeProcessor& proc;
     kf::ui::KfLookAndFeel lnf;

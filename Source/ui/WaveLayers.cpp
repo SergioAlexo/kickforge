@@ -71,6 +71,16 @@ void WaveService::run()
             scratch->sync (proc);
             const double ms = std::clamp (LayerScratch::neededMs (proc) + 40.0, 100.0, 4500.0);
             r->buffers = scratch->render (ms * 0.001, renderRate);
+            {
+                double last = 0.0;
+                auto scan = [&] (const std::vector<float>& v)
+                {
+                    for (int i = (int) v.size() - 1; i >= 0; --i)
+                        if (std::abs (v[(size_t) i]) > 0.001f) { last = std::max (last, 1000.0 * (i + 1) / r->buffers.sampleRate); break; }
+                };
+                for (auto& l : r->buffers.layer) scan (l);
+                r->audibleMs = last;
+            }
             r->serial = gen;
             r->renderMs = juce::Time::getMillisecondCounterHiRes() - t0;
             result.store (std::shared_ptr<const WaveResult> (std::move (r)));
@@ -195,12 +205,15 @@ void paintWaveLayers (juce::Graphics& g, const WaveResult* res, const RefWave& r
     if (res != nullptr && ! res->buffers.mix.empty())
     {
         const auto& b = res->buffers;
+        auto audible = [] (const std::vector<float>& v)
+        {
+            for (float x : v) if (std::abs (x) > 1.0e-5f) return true;
+            return false;
+        };
         auto cols = [&] (const std::vector<float>& s)
         {
             return columns (s.data(), (int) s.size(), b.sampleRate, v, lengthMs, x0, x1, 1.0f);
         };
-        if (d.mix)
-            outlineCols (g, cols (b.mix), x0, cy, half, wavecol::mix.withAlpha (0.75f), 1.0f);
         if (d.sub)
         {
             const auto c = cols (b.layer[0]);
@@ -210,12 +223,17 @@ void paintWaveLayers (juce::Graphics& g, const WaveResult* res, const RefWave& r
         if (d.clicks)
             for (int l = 0; l < 4; ++l)
             {
+                if (! audible (b.layer[(size_t) l + 1])) continue; // layer off: no hairline
                 const bool active = d.activeClick == l;
-                const float a = d.activeClick < 0 ? 0.7f : (active ? 0.7f : 0.3f);
-                const auto c = cols (b.layer[(size_t) l + 1]);
+                const float a = d.activeClick < 0 || active ? 0.85f : 0.4f;
+                auto c = cols (b.layer[(size_t) l + 1]);
+                for (size_t i = 0; i < c.ok.size(); ++i) // silent stretches: no hairline
+                    if (c.hi[i] - c.lo[i] < 0.004f) c.ok[i] = 0;
                 fillCols (g, c, x0, cy, half, wavecol::click (l).withAlpha (a));
-                if (active) outlineCols (g, c, x0, cy, half, wavecol::click (l).withAlpha (0.8f), 1.0f);
+                outlineCols (g, c, x0, cy, half, wavecol::click (l).withAlpha (active || d.activeClick < 0 ? 1.0f : 0.6f), 1.0f);
             }
+        if (d.mix)
+            outlineCols (g, cols (b.mix), x0, cy, half, wavecol::mix.withAlpha (0.9f), 1.2f);
     }
     if (d.reference && ref.valid())
     {

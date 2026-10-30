@@ -50,8 +50,9 @@ void CurveEditor::setSource (Source s)
 
 void CurveEditor::fitView()
 {
+    viewTouched = false;
     view.t0 = 0.0;
-    view.t1 = 1.0;
+    view.t1 = defaultSpanT();
     double lo = src.vmin, hi = src.vmax;
     if (src.fitToCurve && ! curve.empty())
     {
@@ -72,6 +73,20 @@ void CurveEditor::fitView()
     const double pad = (hi - lo) * (src.fitToCurve ? 0.12 : 0.06);
     view.vBottom = lo - pad;
     view.vTop = hi + pad;
+    repaint();
+}
+
+double CurveEditor::defaultSpanT() const
+{
+    if (! src.viewMs) return 1.0;
+    return std::clamp (src.viewMs() / getLengthMs(), 0.02, 50.0);
+}
+
+void CurveEditor::refreshDefaultView()
+{
+    if (viewTouched || drag != Drag::none) return;
+    view.t0 = 0.0;
+    view.t1 = defaultSpanT();
     repaint();
 }
 
@@ -380,6 +395,7 @@ void CurveEditor::mouseDown (const juce::MouseEvent& e)
     {
         selected = -1;
         drag = Drag::pan;
+        viewTouched = true;
         panT0 = view.t0;
         panT1 = view.t1;
     }
@@ -461,11 +477,13 @@ void CurveEditor::mouseDoubleClick (const juce::MouseEvent& e)
 
 void CurveEditor::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
 {
+    viewTouched = true;
+    const double tl = tLimit();
     const double span = view.t1 - view.t0;
     if (e.mods.isShiftDown() || std::abs (w.deltaX) > std::abs (w.deltaY))
     {
         const double d = (e.mods.isShiftDown() ? w.deltaY : -w.deltaX) * span * 0.5;
-        const double dt = std::clamp (-d, -view.t0, 1.0 - view.t1);
+        const double dt = std::clamp (-d, -view.t0, tl - view.t1);
         view.t0 += dt;
         view.t1 += dt;
     }
@@ -477,14 +495,14 @@ void CurveEditor::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWh
     }
     else
     {
-        const double f = std::exp (-w.deltaY * 0.6), tc = std::clamp (view.xToTime (e.position.x), 0.0, 1.0);
+        const double f = std::exp (-w.deltaY * 0.6), tc = std::clamp (view.xToTime (e.position.x), 0.0, tl);
         double n0 = tc - (tc - view.t0) * f, n1 = tc + (view.t1 - tc) * f;
         if (n1 - n0 < kMinSpan) { n0 = tc - kMinSpan / 2; n1 = tc + kMinSpan / 2; }
-        if (n1 - n0 > 1.0) { n0 = 0; n1 = 1; }
+        if (n1 - n0 > tl) { n0 = 0; n1 = tl; }
         if (n0 < 0) { n1 -= n0; n0 = 0; }
-        if (n1 > 1) { n0 -= n1 - 1; n1 = 1; }
+        if (n1 > tl) { n0 -= n1 - tl; n1 = tl; }
         view.t0 = std::max (0.0, n0);
-        view.t1 = std::min (1.0, n1);
+        view.t1 = std::min (tl, n1);
     }
     repaint();
 }

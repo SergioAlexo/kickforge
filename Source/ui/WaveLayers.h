@@ -32,6 +32,7 @@ struct WaveResult
     LayerBuffers buffers;
     juce::uint64 serial = 0;     // request generation this render covers
     double renderMs = 0.0;       // wall time of sync + render
+    double audibleMs = 0.0;      // last sample above -60 dBFS in any layer (sub, clicks) or the mix
 };
 
 /** Background renderer of the layered kick for the curve editor's backdrop. Watches the processor's parameters, curves,
