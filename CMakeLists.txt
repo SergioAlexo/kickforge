@@ -42,6 +42,7 @@ set(KICKFORGE_ENGINE_SOURCES
     Source/ui/Panels.cpp
     Source/ui/ImportDialog.cpp
     Source/ui/LivePanel.cpp
+    Source/ui/WaveLayers.cpp
     Source/presets/PresetManager.cpp
     Source/presets/FactoryPresets.cpp
     Source/presets/KickRenderer.cpp
@@ -104,6 +105,7 @@ add_executable(KickforgeTests
     tests/PreviewTests.cpp
     tests/LiveTests.cpp
     tests/CliTests.cpp
+    tests/WaveTests.cpp
     ${KICKFORGE_CLI_SOURCES})
 target_include_directories(KickforgeTests PRIVATE Source)
 target_compile_definitions(KickforgeTests PRIVATE

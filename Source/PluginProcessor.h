@@ -10,6 +10,25 @@
 #include "live/Reference.h"
 #include "live/LiveLink.h"
 
+namespace kf
+{
+/** Offline capture of the pre-FX layers (WAVE: waveform behind the curve editor). Only ever attached to a private
+    scratch processor, never the live one; buffers are preallocated by the owner. */
+struct LayerTap
+{
+    static constexpr int numLayers = 1 + 4; // sub, click 1..4
+    std::array<std::vector<float>, numLayers> layer; // mono, before pan / routing
+    std::vector<float> preFx;                        // master-L sum of all buses before the FX chains
+    int pos = 0;                                     // advanced by every rendered chunk
+};
+
+/** UI-only layer toggles for the curve-editor background waveform. Persisted beside the parameter state, not a parameter. */
+struct WaveUiSettings
+{
+    std::atomic<bool> sub { true }, clicks { true }, reference { true }, mix { false };
+};
+}
+
 class KickforgeProcessor : public juce::AudioProcessor
 {
 public:
@@ -56,6 +75,10 @@ public:
     /** AI link: the loaded reference kick (A/B against the synth) and the live-folder link. */
     kf::Reference& getReference() noexcept { return reference; }
     kf::LiveLink& getLiveLink() noexcept { return live; }
+    /** Curve-editor background layer toggles (UI state). */
+    kf::WaveUiSettings& getWaveSettings() noexcept { return waveUi; }
+    /** Scratch processors only: capture the pre-FX layers while rendering. Not for the live instance. */
+    void setLayerTap (kf::LayerTap* t) noexcept { layerTap = t; }
 
 private:
     void handleMidi (const juce::MidiMessage&, int pos);
@@ -92,5 +115,7 @@ private:
     int moPendNote = 0, moPendChan = 1, moPendIn = 0; // moPendIn: samples from the start of the current block
 
     kf::Reference reference;
+    kf::WaveUiSettings waveUi;
+    kf::LayerTap* layerTap = nullptr;
     kf::LiveLink live { *this, reference }; // last: it listens to apvts and uses the members above
 };

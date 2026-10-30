@@ -33,6 +33,17 @@ public:
     ~CurveEditor() override { stopTimer(); }
 
     void setSource (Source);
+
+    /** Backdrop painted inside the plot, under the grid and the curve (waveform layers). Args: view, plot rect, time axis length in ms. */
+    std::function<void (juce::Graphics&, const CurveView&, juce::Rectangle<int>, double)> paintBackdrop;
+    /** Layer toggles in the toolbar: 0 Sub, 1 Clicks, 2 Reference, 3 Mix. */
+    static constexpr int numLayerToggles = 4;
+    std::function<void (int, bool)> onLayerToggle;
+    void setLayerToggle (int i, bool on) { layerBtns[(size_t) i].setToggleState (on, juce::dontSendNotification); repaint(); }
+    void setLayerToggleEnabled (int i, bool en) { layerBtns[(size_t) i].setEnabled (en); }
+    bool getLayerToggle (int i) const { return layerBtns[(size_t) i].getToggleState(); }
+    juce::Button& getLayerButton (int i) { return layerBtns[(size_t) i]; }
+    double getLengthMs() const { return src.lengthMs ? std::max (1.0, src.lengthMs()) : 1000.0; }
     const Curve& getCurve() const noexcept { return curve; }
 
     void undo();
@@ -88,6 +99,7 @@ private:
     bool mouseInside = false;
 
     juce::ToggleButton timeSnapBtn { "Time snap" }, valSnapBtn { "Note snap" }, logBtn { "Log time" };
+    std::array<juce::TextButton, 4> layerBtns;
     juce::TextButton fitBtn { "Fit" }, undoBtn { "Undo" }, redoBtn { "Redo" };
     juce::Rectangle<int> plot;
 };

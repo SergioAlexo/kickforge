@@ -67,6 +67,9 @@ public:
     juce::ValueTree saveState() const;
     void loadState (const juce::ValueTree&);
 
+    /** The decoded sample of a slot at its original rate (null if none / still loading). Lets a scratch renderer copy it. */
+    std::shared_ptr<const std::vector<float>> getSourceSample (int layer, double& rate) const;
+
     static constexpr int envTableSize = 256;
 
 private:

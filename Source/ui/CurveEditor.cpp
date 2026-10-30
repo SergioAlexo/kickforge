@@ -12,6 +12,20 @@ CurveEditor::CurveEditor()
     setWantsKeyboardFocus (true);
     for (auto* b : std::initializer_list<juce::Button*> { &timeSnapBtn, &valSnapBtn, &logBtn, &fitBtn, &undoBtn, &redoBtn })
         addAndMakeVisible (b);
+    {
+        static const char* names[] = { "Sub", "Clicks", "Ref", "Mix" };
+        static const char* tips[] = { "Show the sub waveform behind the curve", "Show the click layers behind the curve",
+                                      "Show the reference kick behind the curve (needs a loaded reference)", "Show the full post-FX mix outline" };
+        for (size_t i = 0; i < layerBtns.size(); ++i)
+        {
+            auto& b = layerBtns[i];
+            b.setButtonText (names[i]);
+            b.setTooltip (tips[i]);
+            b.setClickingTogglesState (true);
+            b.onClick = [this, i] { if (onLayerToggle) onLayerToggle ((int) i, layerBtns[i].getToggleState()); repaint(); };
+            addAndMakeVisible (b);
+        }
+    }
     timeSnapBtn.setToggleState (true, juce::dontSendNotification);
     valSnapBtn.setToggleState (true, juce::dontSendNotification);
     logBtn.onClick = [this] { view.logTime = logBtn.getToggleState(); repaint(); };
@@ -68,7 +82,8 @@ void CurveEditor::resized()
     timeSnapBtn.setBounds (bar.removeFromLeft (84)); bar.removeFromLeft (4);
     valSnapBtn.setBounds (bar.removeFromLeft (84)); bar.removeFromLeft (4);
     logBtn.setBounds (bar.removeFromLeft (76)); bar.removeFromLeft (4);
-    fitBtn.setBounds (bar.removeFromLeft (40));
+    fitBtn.setBounds (bar.removeFromLeft (40)); bar.removeFromLeft (12);
+    for (auto& b : layerBtns) { b.setBounds (bar.removeFromLeft (b.getButtonText().length() > 3 ? 48 : 40)); bar.removeFromLeft (3); }
     redoBtn.setBounds (bar.removeFromRight (50)); bar.removeFromRight (4);
     undoBtn.setBounds (bar.removeFromRight (50));
     plot = r.withTrimmedLeft (46).withTrimmedBottom (18).withTrimmedRight (8).withTrimmedTop (6);
@@ -219,6 +234,7 @@ void CurveEditor::paint (juce::Graphics& g)
     const auto pf = plot.toFloat();
     g.setColour (bg);
     g.fillRect (pf);
+    if (paintBackdrop) paintBackdrop (g, view, plot, getLengthMs());
 
     g.setFont (juce::Font (juce::FontOptions (10.5f)));
     // time grid
