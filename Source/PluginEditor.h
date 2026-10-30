@@ -8,6 +8,7 @@
 #include "ui/LivePanel.h"
 #include "ui/Panels.h"
 #include "ui/Views.h"
+#include "ui/WaveLayers.h"
 
 /** Kickforge editor. Laid out on a fixed 1120x740 design canvas that is scaled to the window,
     so resizing keeps the aspect ratio (U-01). */
@@ -26,6 +27,8 @@ public:
     void selectTab (int index);
     int getCurveIndex() const noexcept { return curveIndex; }
     kf::ui::CurveEditor& getCurveEditor() noexcept { return curveEditor; }
+    kf::ui::WaveService& getWaveService() noexcept { return waveService; }
+    double getSharedAxisMs() const { return sharedAxisMs(); }
     kf::ui::LiveToggle& getLiveToggle() noexcept { return liveToggle; }
     kf::ui::ReferenceStrip& getRefStrip() noexcept { return refStrip; }
     /** Runs one timer tick (tests: drains the scope FIFO and refreshes the views). */
@@ -46,6 +49,8 @@ private:
     void timerCallback() override;
     kf::ui::CurveEditor::Source makeSource (int index);
     juce::String fundamentalText() const;
+    /** One absolute-ms timeline for every curve tab: max(sub length, audible end of the rendered layers). */
+    double sharedAxisMs() const;
 
     KickforgeProcessor& proc;
     kf::ui::KfLookAndFeel lnf;
@@ -60,6 +65,8 @@ private:
     juce::TooltipWindow tooltips { this, 600 };
 
     std::array<juce::TextButton, 9> curveButtons;
+    kf::ui::WaveService waveService;
+    kf::ui::RefTracker refTracker;
     kf::ui::CurveEditor curveEditor;
     kf::ui::WaveformView waveform;
     kf::ui::SpectrumView spectrum;

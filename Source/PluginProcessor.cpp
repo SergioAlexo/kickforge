@@ -134,8 +134,25 @@ void KickforgeProcessor::renderChunk (juce::AudioBuffer<float>& buffer, int star
         monoBuf.clear (0, n);
         if (src < 0) sub.process (monoBuf, 0, n);
         else click.processLayer (src, monoBuf.getWritePointer (0), n);
+        if (layerTap != nullptr) // scratch renders only
+        {
+            auto& dst = layerTap->layer[(size_t) (src + 1)];
+            if (layerTap->pos + n <= (int) dst.size())
+                std::copy_n (monoBuf.getReadPointer (0), n, dst.data() + layerTap->pos);
+        }
         if (src < 0) addRouted (sub.getBus(), sub.getPan(), n, 0);
         else addRouted (click.getLayerBus (src), click.getLayerPan (src), n, 1);
+    }
+
+    if (layerTap != nullptr)
+    {
+        if (layerTap->pos + n <= (int) layerTap->preFx.size())
+        {
+            const float *a = mixBuf.getReadPointer (0), *b = mixBuf.getReadPointer (2), *c = mixBuf.getReadPointer (4);
+            float* d = layerTap->preFx.data() + layerTap->pos;
+            for (int i = 0; i < n; ++i) d[i] = a[i] + b[i] + c[i];
+        }
+        layerTap->pos += n;
     }
 
     const float gTarget = juce::Decibels::decibelsToGain (gainParam != nullptr ? gainParam->load() : 0.0f);
@@ -267,6 +284,11 @@ void KickforgeProcessor::getStateInformation (juce::MemoryBlock& dest)
         auto lx = reference.saveState();
         lx->setAttribute ("link", live.isEnabled());
         xml->addChildElement (lx.release());
+        auto* ux = xml->createNewChildElement ("kfWaveUi"); // UI settings, not parameters
+        ux->setAttribute ("sub", waveUi.sub.load());
+        ux->setAttribute ("clicks", waveUi.clicks.load());
+        ux->setAttribute ("reference", waveUi.reference.load());
+        ux->setAttribute ("mix", waveUi.mix.load());
         copyXmlToBinary (*xml, dest);
     }
 }
@@ -281,6 +303,14 @@ void KickforgeProcessor::setStateInformation (const void* data, int size)
             {
                 liveXml = std::make_unique<juce::XmlElement> (*l);
                 xml->removeChildElement (l, true);
+            }
+            if (auto* u = xml->getChildByName ("kfWaveUi"))
+            {
+                waveUi.sub = u->getBoolAttribute ("sub", true);
+                waveUi.clicks = u->getBoolAttribute ("clicks", true);
+                waveUi.reference = u->getBoolAttribute ("reference", true);
+                waveUi.mix = u->getBoolAttribute ("mix", false);
+                xml->removeChildElement (u, true);
             }
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
             click.loadState (apvts.state.getChildWithName ("click"));

@@ -23,6 +23,7 @@ public:
         bool fitToCurve = false;                     // Fit / select / external load frames the curve's own value range (zoom out stays possible)
         double hardMin = -1e9, hardMax = 1e9;        // node value limits
         std::function<double()> lengthMs;            // optional: time axis in ms
+        std::function<double()> viewMs;              // optional: absolute ms shown by the default view / Fit (shared timeline)
         std::function<double (double)> snapValue;    // optional: note snap (pitch curves)
         std::function<juce::String (double t, double v)> valueText; // optional: extra readout
         juce::String unit;
@@ -33,11 +34,26 @@ public:
     ~CurveEditor() override { stopTimer(); }
 
     void setSource (Source);
+
+    /** Backdrop painted inside the plot, under the grid and the curve (waveform layers). Args: view, plot rect, time axis length in ms. */
+    std::function<void (juce::Graphics&, const CurveView&, juce::Rectangle<int>, double)> paintBackdrop;
+    /** Layer toggles in the toolbar: 0 Sub, 1 Clicks, 2 Reference, 3 Mix. */
+    static constexpr int numLayerToggles = 4;
+    std::function<void (int, bool)> onLayerToggle;
+    void setLayerToggle (int i, bool on) { layerBtns[(size_t) i].setToggleState (on, juce::dontSendNotification); repaint(); }
+    void setLayerToggleEnabled (int i, bool en) { layerBtns[(size_t) i].setEnabled (en); }
+    bool getLayerToggle (int i) const { return layerBtns[(size_t) i].getToggleState(); }
+    juce::Button& getLayerButton (int i) { return layerBtns[(size_t) i]; }
+    double getLengthMs() const { return src.lengthMs ? std::max (1.0, src.lengthMs()) : 1000.0; }
     const Curve& getCurve() const noexcept { return curve; }
 
     void undo();
     void redo();
     void fitView();
+    /** Re-applies the default time span unless the user zoomed / panned (the shared axis changed). */
+    void refreshDefaultView();
+    /** Colour shown on a layer toggle (legend): fills the button when on, outlines it when off. */
+    void setLayerColour (int i, juce::Colour c) { layerBtns[(size_t) i].legend = c; }
 
     void resized() override;
     void paint (juce::Graphics&) override;
@@ -88,6 +104,26 @@ private:
     bool mouseInside = false;
 
     juce::ToggleButton timeSnapBtn { "Time snap" }, valSnapBtn { "Note snap" }, logBtn { "Log time" };
+    struct LayerButton : juce::TextButton
+    {
+        juce::Colour legend { 0xff888888 };
+        void paintButton (juce::Graphics& g, bool over, bool) override
+        {
+            const auto r = getLocalBounds().toFloat().reduced (1.0f);
+            const bool on = getToggleState(), en = isEnabled();
+            g.setColour (on ? legend.withAlpha (en ? (over ? 0.95f : 0.85f) : 0.3f) : juce::Colour (0xff1b2230));
+            g.fillRoundedRectangle (r, 4.0f);
+            g.setColour (legend.withAlpha (on ? 0.0f : (en ? 0.55f : 0.2f)));
+            g.drawRoundedRectangle (r, 4.0f, 1.0f);
+            g.setColour (on ? juce::Colour (0xff10141c).withAlpha (en ? 1.0f : 0.5f) : legend.withAlpha (en ? 0.9f : 0.35f));
+            g.setFont (juce::Font (juce::FontOptions (12.0f)));
+            g.drawText (getButtonText(), getLocalBounds(), juce::Justification::centred);
+        }
+    };
+    std::array<LayerButton, 4> layerBtns;
+    bool viewTouched = false;
+    double defaultSpanT() const;
+    double tLimit() const { return std::max (1.0, defaultSpanT()); }
     juce::TextButton fitBtn { "Fit" }, undoBtn { "Undo" }, redoBtn { "Redo" };
     juce::Rectangle<int> plot;
 };

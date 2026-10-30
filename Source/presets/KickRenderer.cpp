@@ -75,6 +75,96 @@ juce::AudioBuffer<float> renderKick (KickforgeProcessor& live, const RenderOptio
     return renderKickFromState (state, o);
 }
 
+LayerScratch::LayerScratch() : proc (std::make_unique<KickforgeProcessor>())
+{
+    proc->setPlayConfigDetails (0, 2, 44100.0, 512);
+}
+
+LayerScratch::~LayerScratch() = default;
+
+double LayerScratch::neededMs (KickforgeProcessor& live)
+{
+    double ms = live.apvts.getRawParameterValue ("sub_length")->load();
+    for (int l = 0; l < kNumClickLayers; ++l)
+        if (live.apvts.getRawParameterValue (clickParamId (l, CP::source))->load() > 0.5f) // source not Off
+            ms = std::max (ms, (double) live.apvts.getRawParameterValue (clickParamId (l, CP::length))->load());
+    return ms;
+}
+
+void LayerScratch::sync (KickforgeProcessor& live)
+{
+    auto& lp = live.getParameters();
+    auto& sp = proc->getParameters();
+    for (int i = 0; i < lp.size() && i < sp.size(); ++i)
+        if (sp[i]->getValue() != lp[i]->getValue())
+            sp[i]->setValueNotifyingHost (lp[i]->getValue()); // notifies the scratch APVTS adapters (raw values)
+    for (int c = 0; c < 5; ++c)
+    {
+        auto cur = live.getSubCurves().getCurve ((SubCurveId) c);
+        if (! primed || ! (cur == subSeen[(size_t) c]))
+        {
+            proc->getSubCurves().setCurve ((SubCurveId) c, cur);
+            subSeen[(size_t) c] = cur;
+        }
+    }
+    for (int l = 0; l < kNumClickLayers; ++l)
+    {
+        double rate = 0.0;
+        auto smp = live.getClickLayer().getSourceSample (l, rate);
+        if (smp != sampleSeen[(size_t) l])
+        {
+            if (smp != nullptr && rate > 0.0) proc->getClickLayer().loadSampleFromMemory (l, *smp, rate, "scratch");
+            else proc->getClickLayer().clearSample (l);
+            sampleSeen[(size_t) l] = smp;
+        }
+        auto env = live.getClickLayer().getEnvelope (l);
+        if (! primed || ! (env == clickEnvSeen[(size_t) l]))
+        {
+            proc->getClickLayer().setEnvelope (l, env);
+            clickEnvSeen[(size_t) l] = env;
+        }
+    }
+    primed = true;
+}
+
+LayerBuffers LayerScratch::render (double seconds, double sr, int note)
+{
+    constexpr int block = 512;
+    proc->prepareToPlay (sr, block); // also clears voices and FX tails
+    if (note < 0)
+        note = juce::jlimit (0, 127, juce::roundToInt (proc->apvts.getRawParameterValue ("sub_root")->load()));
+    const int latency = proc->getLatencySamples();
+    const int len = std::max (block, (int) std::ceil (seconds * sr));
+    const int total = ((len + latency + block - 1) / block) * block;
+
+    LayerTap tap;
+    for (auto& l : tap.layer) l.assign ((size_t) total, 0.0f);
+    tap.preFx.assign ((size_t) total, 0.0f);
+    proc->setLayerTap (&tap);
+
+    LayerBuffers r;
+    r.sampleRate = sr;
+    std::vector<float> out;
+    out.reserve ((size_t) total);
+    juce::AudioBuffer<float> buf (2, block);
+    juce::MidiBuffer midi;
+    for (int pos = 0; pos < total; pos += block)
+    {
+        midi.clear();
+        if (pos == 0) midi.addEvent (juce::MidiMessage::noteOn (1, note, 1.0f), 0);
+        proc->processBlock (buf, midi);
+        const float* d = buf.getReadPointer (0);
+        for (int i = 0; i < block; ++i) out.push_back (std::isfinite (d[i]) ? d[i] : 0.0f);
+    }
+    proc->setLayerTap (nullptr);
+
+    for (size_t k = 0; k < r.layer.size(); ++k)
+        r.layer[k].assign (tap.layer[k].begin(), tap.layer[k].begin() + len);
+    r.preFx.assign (tap.preFx.begin(), tap.preFx.begin() + len);
+    r.mix.assign (out.begin() + std::min (latency, total - len), out.begin() + std::min (latency, total - len) + len);
+    return r;
+}
+
 bool writeWav24 (const juce::File& file, const juce::AudioBuffer<float>& b, double sampleRate)
 {
     file.getParentDirectory().createDirectory();

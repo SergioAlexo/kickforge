@@ -321,6 +321,15 @@ void ClickLayer::loadSampleFromMemory (int layer, std::vector<float> mono, doubl
     resampleAndPublish (layer, gen);
 }
 
+std::shared_ptr<const std::vector<float>> ClickLayer::getSourceSample (int layer, double& rate) const
+{
+    rate = 0.0;
+    if (layer < 0 || layer >= kNumClickLayers) return {};
+    const juce::ScopedLock sl (stateLock);
+    rate = slots[(size_t) layer].originalRate;
+    return slots[(size_t) layer].original;
+}
+
 void ClickLayer::clearSample (int layer)
 {
     if (layer < 0 || layer >= kNumClickLayers) return;

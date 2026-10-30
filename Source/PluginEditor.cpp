@@ -27,7 +27,7 @@ void KickforgeEditor::Content::paint (juce::Graphics& g)
 
 KickforgeEditor::KickforgeEditor (KickforgeProcessor& p)
     : AudioProcessorEditor (&p), proc (p), presetBar (p), liveToggle (p), refStrip (p),
-      curveEditor(), waveform (analyser), spectrum (analyser),
+      waveService (p), curveEditor(), waveform (analyser), spectrum (analyser),
       subPanel (p.apvts), harmPanel (p.apvts), clickPanel (p.apvts, p.getClickLayer(), [this] (int l) { selectCurve (5 + l); }),
       fxPanel (p.apvts), eqPanel (p.apvts, analyser), dynPanel (p.apvts), globalPanel (p.apvts)
 {
@@ -65,6 +65,32 @@ KickforgeEditor::KickforgeEditor (KickforgeProcessor& p)
         content.addAndMakeVisible (b);
     }
     content.addAndMakeVisible (curveEditor);
+    {
+        auto& ws = proc.getWaveSettings();
+        curveEditor.setLayerToggle (0, ws.sub);
+        curveEditor.setLayerToggle (1, ws.clicks);
+        curveEditor.setLayerToggle (2, ws.reference);
+        curveEditor.setLayerToggle (3, ws.mix);
+        curveEditor.setLayerColour (0, kf::ui::wavecol::sub);
+        curveEditor.setLayerColour (1, kf::ui::wavecol::click (0));
+        curveEditor.setLayerColour (2, kf::ui::wavecol::ref);
+        curveEditor.setLayerColour (3, kf::ui::wavecol::mix);
+        curveEditor.onLayerToggle = [this] (int i, bool on)
+        {
+            auto& w = proc.getWaveSettings();
+            (i == 0 ? w.sub : i == 1 ? w.clicks : i == 2 ? w.reference : w.mix) = on;
+        };
+        curveEditor.paintBackdrop = [this] (juce::Graphics& g, const CurveView& v, juce::Rectangle<int> plot, double lenMs)
+        {
+            auto& w = proc.getWaveSettings();
+            kf::ui::WaveDraw d;
+            d.sub = w.sub; d.clicks = w.clicks; d.reference = w.reference; d.mix = w.mix;
+            d.activeClick = curveIndex >= 5 ? curveIndex - 5 : -1;
+            auto res = waveService.latest();
+            kf::ui::paintWaveLayers (g, res.get(), refTracker.get (proc.getReference()), d, v, plot, lenMs);
+        };
+        waveService.onResult = [this] { curveEditor.refreshDefaultView(); curveEditor.repaint(); };
+    }
     content.addAndMakeVisible (waveform);
     content.addAndMakeVisible (spectrum);
 
@@ -157,6 +183,7 @@ CurveEditor::Source KickforgeEditor::makeSource (int index)
         s.set = [proc_, id] (const kf::Curve& c) { proc_->getSubCurves().setCurve (id, c); };
         s.resetToDefault = [proc_, id] { proc_->getSubCurves().resetToDefault (id); };
         s.lengthMs = [raw] { return raw ("sub_length"); };
+        s.viewMs = [this] { return sharedAxisMs(); };
         if (id == kf::SubCurveId::Pitch)
         {
             const bool hz = raw ("sub_pitchmode") > 0.5;
@@ -210,10 +237,18 @@ CurveEditor::Source KickforgeEditor::makeSource (int index)
         s.resetToDefault = [proc_, l] { proc_->getClickLayer().setEnvelope (l, kf::Curve ({ { 0.0, 1.0, 0.0 }, { 1.0, 1.0, 0.0 } })); };
         const auto lenId = kf::clickParamId (l, kf::CP::length);
         s.lengthMs = [ap, lenId] { return (double) ap->getRawParameterValue (lenId)->load(); };
+        s.viewMs = [this] { return sharedAxisMs(); };
         s.vmin = 0.0; s.vmax = 1.0; s.hardMin = 0.0; s.hardMax = 1.0;
         s.colour = juce::Colour (0xffffd166);
     }
     return s;
+}
+
+double KickforgeEditor::sharedAxisMs() const
+{
+    double ms = proc.apvts.getRawParameterValue ("sub_length")->load();
+    if (auto r = waveService.latest()) ms = std::max (ms, r->audibleMs);
+    return std::max (50.0, ms);
 }
 
 juce::String KickforgeEditor::fundamentalText() const
@@ -242,6 +277,7 @@ void KickforgeEditor::timerCallback()
         waveform.repaint();
     }
     spectrum.repaint();
+    curveEditor.setLayerToggleEnabled (2, proc.getReference().hasAudio());
     if (++liveTick % 8 == 0)   // ~4 Hz: link status dot / tooltip, reference overlay
     {
         liveToggle.refresh();
